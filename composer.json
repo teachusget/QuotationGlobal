@@ -1,5 +1,5 @@
 {
-    "name": "quotationpk/application",
+    "name": "quotationglobal/application",
     "type": "project",
     "description": "QuotationGlobal Laravel API with React frontend",
     "require": {
