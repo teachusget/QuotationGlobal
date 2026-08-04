@@ -42,6 +42,14 @@ export function logoutUser() {
   return request('/api/auth/logout', { method: 'POST', headers: authHeaders() })
 }
 
+function authenticatedPatch(path, payload) {
+  return request(path, { method: 'PATCH', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+}
+
+export function updateMyProfile(payload) { return authenticatedPatch('/api/auth/profile', payload) }
+export function updateMyCompany(payload) { return authenticatedPatch('/api/auth/company', payload) }
+export function updateMyPassword(payload) { return authenticatedPatch('/api/auth/password', payload) }
+
 export function requestPasswordReset(email) {
   return request('/api/auth/forgot-password', {
     method: 'POST',

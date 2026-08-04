@@ -5,6 +5,7 @@ import Swal from 'sweetalert2'
 import 'sweetalert2/dist/sweetalert2.min.css'
 import { createCategory, deleteCategory, getCategories, updateCategory } from '../api/categories'
 import CategoryModal from '../components/categories/CategoryModal'
+import { TableSkeleton } from '../components/ui'
 
 const alertOptions = {
   confirmButtonColor: '#0B6FF4',
@@ -221,9 +222,9 @@ export default function CategoriesPage() {
       </div>
 
       {error && <div className="m-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}<button onClick={load} className="ml-2 font-semibold underline">Retry</button></div>}
-      {loading ? <div className="grid min-h-52 place-items-center text-xs text-slate-500">Loading {heading.toLowerCase()}...</div> : filtered.length === 0 ? <div className="grid min-h-60 place-items-center p-6 text-center"><div><span className="mx-auto grid h-11 w-11 place-items-center rounded-md bg-slate-100 text-slate-500"><FolderTree className="h-5 w-5"/></span><h3 className="mt-3 text-sm font-semibold">No {heading.toLowerCase()} found</h3><p className="mt-1 text-xs text-slate-500">{query ? 'Try a different search.' : `Add your first ${type === 'category' ? 'category' : 'sub category'} to get started.`}</p></div></div> : <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] text-left">
-          <thead className="bg-slate-50 text-[10px] uppercase text-slate-500"><tr><th className="px-4 py-3 font-semibold">Name</th>{type === 'subcategory' && <th className="px-4 py-3 font-semibold">Parent category</th>}<th className="px-4 py-3 font-semibold">Details</th><th className="px-4 py-3 font-semibold">Created</th><th className="w-48 px-4 py-3 font-semibold">Actions</th></tr></thead>
+      {loading ? <TableSkeleton columns={5}/> : filtered.length === 0 ? <div className="grid min-h-60 place-items-center p-6 text-center"><div><span className="mx-auto grid h-11 w-11 place-items-center rounded-md bg-slate-100 text-slate-500"><FolderTree className="h-5 w-5"/></span><h3 className="mt-3 text-sm font-semibold">No {heading.toLowerCase()} found</h3><p className="mt-1 text-xs text-slate-500">{query ? 'Try a different search.' : `Add your first ${type === 'category' ? 'category' : 'sub category'} to get started.`}</p></div></div> : <div className="overflow-x-auto">
+        <table className="catalog-data-table w-full min-w-[680px] text-left">
+          <thead className="bg-slate-50 text-[11px] uppercase text-slate-500"><tr><th className="px-4 py-3 font-semibold">Name</th>{type === 'subcategory' && <th className="px-4 py-3 font-semibold">Parent category</th>}<th className="px-4 py-3 font-semibold">Details</th><th className="px-4 py-3 font-semibold">Created</th><th className="w-48 px-4 py-3 font-semibold">Actions</th></tr></thead>
           <tbody className="divide-y">{filtered.map((item) => <tr key={item.id} className="text-xs hover:bg-slate-50/60">
             <td className="px-4 py-3"><div className="flex items-center gap-3">{item.logo_url ? <img src={item.logo_url} alt="" className="h-9 w-9 rounded-md border object-contain"/> : <span className="grid h-9 w-9 place-items-center rounded-md bg-slate-100 text-slate-400"><ImageIcon className="h-4 w-4"/></span>}<span className="font-semibold text-slate-800">{item.name}</span></div></td>
             {type === 'subcategory' && <td className="px-4 py-3 text-slate-600">{item.parent?.name || '-'}</td>}

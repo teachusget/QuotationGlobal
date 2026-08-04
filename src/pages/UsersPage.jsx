@@ -1,0 +1,104 @@
+import { KeyRound, Mail, MoreHorizontal, Plus, Search, ShieldCheck, UserCog, UsersRound } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import Swal from 'sweetalert2'
+import { createUser, getRoles, getUsers, inviteUser, resetUserPassword, setUserStatus, syncUserRoles, updateUser } from '../api/rbac'
+import { getVendors } from '../api/vendors'
+import { useAuth } from '../auth/useAuth'
+import { Alert, Badge, Button, DataTable, EmptyState, FieldError, IconButton, Modal, PageHeader, Pagination, Toolbar } from '../components/ui'
+
+const blankUser = { name: '', username: '', email: '', phone: '', account_type: 'staff', vendor_id: '', roles: [], onboarding: 'invite', password: '', password_confirmation: '' }
+const normalize = (user) => user ? { ...blankUser, ...user, vendor_id: user.vendor_id || '', roles: (user.roles || []).map((role) => role.name), onboarding: 'invite', password: '', password_confirmation: '' } : { ...blankUser }
+
+export default function UsersPage() {
+  const { can } = useAuth()
+  const [users, setUsers] = useState([])
+  const [roles, setRoles] = useState([])
+  const [vendors, setVendors] = useState([])
+  const [meta, setMeta] = useState({})
+  const [filters, setFilters] = useState({ search: '', account_type: '', status: '', role: '', verification: '', page: 1, per_page: 20 })
+  const [appliedSearch, setAppliedSearch] = useState('')
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState(blankUser)
+  const [initialForm, setInitialForm] = useState(blankUser)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [actionMenu, setActionMenu] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [formError, setFormError] = useState('')
+
+  const requestFilters = useMemo(() => ({ ...filters, search: appliedSearch }), [filters, appliedSearch])
+  const load = (background = false) => {
+    background ? setRefreshing(true) : setLoading(true)
+    setError('')
+    return Promise.all([getUsers(requestFilters), getRoles(), getVendors().catch(() => [])])
+      .then(([userResult, roleResult, vendorResult]) => { setUsers(userResult.data || []); setMeta(userResult); setRoles(roleResult.data || []); setVendors(vendorResult) })
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => { setLoading(false); setRefreshing(false) })
+  }
+  // Reload whenever the applied filters or page changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [requestFilters])
+
+  const dirty = editorOpen && JSON.stringify(form) !== JSON.stringify(initialForm)
+  useEffect(() => { if (!dirty) return undefined; const warn = (event) => { event.preventDefault(); event.returnValue = '' }; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn) }, [dirty])
+  const closeEditor = () => { if (dirty && !window.confirm('Discard your unsaved user changes?')) return; setEditorOpen(false) }
+  const openEditor = (user = null) => { const value = normalize(user); setEditing(user); setForm(value); setInitialForm(value); setFormError(''); setEditorOpen(true) }
+  const change = (event) => setForm((current) => ({ ...current, [event.target.name]: event.target.value }))
+  const toggleRole = (name) => setForm((current) => ({ ...current, roles: current.roles.includes(name) ? current.roles.filter((role) => role !== name) : [...current.roles, name] }))
+
+  const validation = useMemo(() => ({
+    email: form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) ? 'Enter a valid email address.' : '',
+    password: !editing && form.onboarding === 'password' && form.password.length < 8 ? 'Use at least 8 characters.' : '',
+    password_confirmation: !editing && form.onboarding === 'password' && form.password !== form.password_confirmation ? 'Passwords do not match.' : '',
+    roles: !form.roles.length ? 'Assign at least one role.' : '',
+    vendor_id: form.account_type === 'vendor' && !form.vendor_id ? 'Choose the linked vendor record.' : '',
+  }), [editing, form])
+  const invalid = Object.values(validation).some(Boolean) || !form.name.trim() || !form.email.trim()
+
+  const submit = async (event) => {
+    event.preventDefault()
+    if (invalid) { setFormError('Correct the highlighted fields before saving.'); return }
+    setSaving(true); setFormError('')
+    try {
+      const payload = { ...form, vendor_id: form.account_type === 'vendor' ? Number(form.vendor_id) : null }
+      const result = editing ? await updateUser(editing.id, payload) : await createUser(payload)
+      if (editing && can('users.assign_roles')) await syncUserRoles(editing.id, form.roles)
+      setInitialForm(form); setEditorOpen(false); await load(true)
+      await Swal.fire({ icon: 'success', title: result.message, timer: 1200, showConfirmButton: false })
+    } catch (requestError) { setFormError(requestError.message) } finally { setSaving(false) }
+  }
+
+  const status = async (user) => {
+    const activating = user.is_blocked
+    const confirmation = await Swal.fire({ title: `${activating ? 'Activate' : 'Deactivate'} ${user.name}?`, text: activating ? 'The user will be able to sign in again.' : 'All active sessions will be revoked immediately.', icon: activating ? 'question' : 'warning', showCancelButton: true, confirmButtonText: activating ? 'Activate user' : 'Deactivate user', confirmButtonColor: activating ? '#059669' : '#dc2626' })
+    if (!confirmation.isConfirmed) return
+    try { await setUserStatus(user.id, activating); await load(true) } catch (requestError) { await Swal.fire('Action failed', requestError.message, 'error') }
+  }
+  const emailAction = async (user, type) => { try { const result = type === 'invite' ? await inviteUser(user.id) : await resetUserPassword(user.id); await Swal.fire({ icon: 'success', title: result.message, timer: 1400, showConfirmButton: false }) } catch (requestError) { await Swal.fire('Action failed', requestError.message, 'error') } }
+
+  const actions = (user) => <div className="relative flex justify-end"><IconButton label={`Actions for ${user.name}`} onClick={() => setActionMenu(actionMenu === user.id ? null : user.id)}><MoreHorizontal className="h-4 w-4"/></IconButton>{actionMenu === user.id && <div className="absolute right-0 top-11 z-20 w-48 overflow-hidden rounded-lg border bg-white py-1 shadow-floating">{can('users.update') && <button type="button" onClick={() => { setActionMenu(null); openEditor(user) }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50"><UserCog className="h-4 w-4"/>Edit user</button>}{can(user.is_blocked ? 'users.activate' : 'users.deactivate') && <button type="button" onClick={() => { setActionMenu(null); status(user) }} className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50 ${user.is_blocked ? 'text-emerald-700' : 'text-red-600'}`}><ShieldCheck className="h-4 w-4"/>{user.is_blocked ? 'Activate user' : 'Deactivate user'}</button>}{can('users.send_invite') && <button type="button" onClick={() => { setActionMenu(null); emailAction(user, 'invite') }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50"><Mail className="h-4 w-4"/>Send invitation</button>}{can('users.reset_password') && <button type="button" onClick={() => { setActionMenu(null); emailAction(user, 'reset') }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50"><KeyRound className="h-4 w-4"/>Reset password</button>}</div>}</div>
+
+  const columns = [{ key: 'user', label: 'User' }, { key: 'type', label: 'Type' }, { key: 'roles', label: 'Roles' }, { key: 'status', label: 'Status' }, { key: 'login', label: 'Last login' }, { key: 'actions', label: 'Actions', className: 'text-right' }]
+  const cell = (user, column) => ({
+    user: <div><b className="text-slate-900">{user.name}</b><p className="mt-1 text-[11px] text-slate-500">{user.email}</p></div>,
+    type: <Badge tone="neutral" className="capitalize">{user.account_type}</Badge>,
+    roles: <div className="flex max-w-xs flex-wrap gap-1">{user.roles?.map((role) => <Badge key={role.id} tone="primary">{role.name}</Badge>)}</div>,
+    status: <Badge tone={user.is_blocked ? 'danger' : 'success'}>{user.is_blocked ? 'Inactive' : 'Active'}</Badge>,
+    login: <span className="text-xs text-slate-500">{user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Never'}</span>,
+    actions: actions(user),
+  }[column.key])
+
+  return <section onClick={(event) => { if (!event.target.closest('[aria-label^="Actions for"]')) setActionMenu(null) }}>
+    <PageHeader eyebrow="Access control" title="Users" description="Manage staff, buyer and vendor accounts, access roles and account status." actions={can('users.create') && <Button icon={Plus} onClick={() => openEditor()}>Create user</Button>}/>
+    <Toolbar className="mt-6"><form onSubmit={(event) => { event.preventDefault(); setFilters((current) => ({ ...current, page: 1 })); setAppliedSearch(filters.search.trim()) }} className="flex min-w-0 flex-1 gap-2"><label className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} placeholder="Search name, email or username…" className="w-full rounded-lg border pl-9 pr-3"/></label><Button type="submit" variant="secondary">Search</Button></form><div className="grid min-w-0 flex-1 grid-cols-2 gap-2 lg:grid-cols-4">{[['account_type', ['staff', 'buyer', 'vendor']], ['status', ['active', 'inactive']], ['verification', ['verified', 'unverified']]].map(([key, options]) => <select aria-label={`Filter by ${key.replace('_', ' ')}`} key={key} value={filters[key]} onChange={(event) => setFilters((current) => ({ ...current, [key]: event.target.value, page: 1 }))} className="min-w-0 rounded-lg border px-2 text-xs"><option value="">All {key.replace('_', ' ')}</option>{options.map((option) => <option key={option}>{option}</option>)}</select>)}<select aria-label="Filter by role" value={filters.role} onChange={(event) => setFilters((current) => ({ ...current, role: event.target.value, page: 1 }))} className="min-w-0 rounded-lg border px-2 text-xs"><option value="">All roles</option>{roles.map((role) => <option key={role.id}>{role.name}</option>)}</select></div>{refreshing && <span className="text-xs text-slate-400">Refreshing…</span>}</Toolbar>
+    {error && <Alert className="mt-5">{error}<button type="button" onClick={() => load()} className="ml-2 font-semibold underline">Retry</button></Alert>}
+    <div className="mt-5"><DataTable columns={columns} rows={users} loading={loading} renderCell={cell} empty={<EmptyState icon={UsersRound} title="No users found" description="Try changing your search or filters." action={can('users.create') && <Button icon={Plus} onClick={() => openEditor()}>Create user</Button>}/>} renderMobile={(user) => <div><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate font-semibold text-slate-900">{user.name}</h3><p className="truncate text-xs text-slate-500">{user.email}</p></div>{actions(user)}</div><div className="mt-3 flex flex-wrap gap-1"><Badge className="capitalize">{user.account_type}</Badge><Badge tone={user.is_blocked ? 'danger' : 'success'}>{user.is_blocked ? 'Inactive' : 'Active'}</Badge>{user.roles?.map((role) => <Badge key={role.id} tone="primary">{role.name}</Badge>)}</div><p className="mt-3 text-[11px] text-slate-400">Last login: {user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Never'}</p></div>}/></div>
+    {!loading && <Pagination current={meta.current_page || 1} last={meta.last_page || 1} from={meta.from} to={meta.to} total={meta.total} pageSize={filters.per_page} onPageSizeChange={(per_page) => setFilters((current) => ({ ...current, per_page, page: 1 }))} onChange={(page) => setFilters((current) => ({ ...current, page }))}/>} 
+
+    <Modal open={editorOpen} onClose={closeEditor} title={editing ? `Edit ${editing.name}` : 'Create user'} description={editing ? 'Update account details and assigned roles.' : 'Create an account with an invitation or administrator-supplied password.'} size="md" footer={<><Button variant="secondary" onClick={closeEditor}>Cancel</Button><Button form="user-editor" type="submit" loading={saving} disabled={invalid}>{saving ? 'Saving user' : 'Save user'}</Button></>}>
+      <form id="user-editor" onSubmit={submit} noValidate><div className="grid gap-4 sm:grid-cols-2">{formError && <Alert className="sm:col-span-2">{formError}</Alert>}<label className="text-xs font-semibold text-slate-700">Full name<input name="name" value={form.name} onChange={change} required className="mt-1.5 w-full rounded-lg border px-3 font-normal"/></label><label className="text-xs font-semibold text-slate-700">Username<input name="username" value={form.username || ''} onChange={change} className="mt-1.5 w-full rounded-lg border px-3 font-normal"/></label><label className="text-xs font-semibold text-slate-700">Email<input type="email" name="email" value={form.email} onChange={change} required aria-invalid={Boolean(validation.email)} className="mt-1.5 w-full rounded-lg border px-3 font-normal aria-[invalid=true]:border-red-400"/><FieldError>{validation.email}</FieldError></label><label className="text-xs font-semibold text-slate-700">Phone<input name="phone" value={form.phone || ''} onChange={change} className="mt-1.5 w-full rounded-lg border px-3 font-normal"/></label><label className="text-xs font-semibold text-slate-700">Account type<select name="account_type" value={form.account_type} onChange={change} className="mt-1.5 w-full rounded-lg border px-3 font-normal">{['staff', 'buyer', 'vendor'].map((type) => <option key={type}>{type}</option>)}</select></label>{form.account_type === 'vendor' && <label className="text-xs font-semibold text-slate-700">Linked vendor<select name="vendor_id" value={form.vendor_id} onChange={change} aria-invalid={Boolean(validation.vendor_id)} className="mt-1.5 w-full rounded-lg border px-3 font-normal aria-[invalid=true]:border-red-400"><option value="">Choose vendor…</option>{vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.company_name || vendor.name}</option>)}</select><FieldError>{validation.vendor_id}</FieldError></label>}{!editing && <><label className="text-xs font-semibold text-slate-700">Onboarding<select name="onboarding" value={form.onboarding} onChange={change} className="mt-1.5 w-full rounded-lg border px-3 font-normal"><option value="invite">Email invitation</option><option value="password">Set password</option></select></label>{form.onboarding === 'password' && <><label className="text-xs font-semibold text-slate-700">Password<input type="password" name="password" value={form.password} onChange={change} aria-invalid={Boolean(validation.password)} className="mt-1.5 w-full rounded-lg border px-3 font-normal aria-[invalid=true]:border-red-400"/><FieldError>{validation.password}</FieldError></label><label className="text-xs font-semibold text-slate-700">Confirm password<input type="password" name="password_confirmation" value={form.password_confirmation} onChange={change} aria-invalid={Boolean(validation.password_confirmation)} className="mt-1.5 w-full rounded-lg border px-3 font-normal aria-[invalid=true]:border-red-400"/><FieldError>{validation.password_confirmation}</FieldError></label></>}</>}</div><fieldset className="mt-5"><legend className="text-xs font-semibold text-slate-700">Assigned roles</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{roles.map((role) => <label key={role.id} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-xs font-medium ${form.roles.includes(role.name) ? 'border-blue-200 bg-blue-50 text-primary' : ''}`}><input type="checkbox" checked={form.roles.includes(role.name)} onChange={() => toggleRole(role.name)} className="h-4 w-4 accent-primary"/>{role.name}</label>)}</div><FieldError>{validation.roles}</FieldError></fieldset></form>
+    </Modal>
+  </section>
+}

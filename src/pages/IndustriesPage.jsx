@@ -1,8 +1,10 @@
-import { Factory, Plus } from 'lucide-react'
+import { Factory, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Swal from 'sweetalert2'
-import { createIndustry, getIndustries } from '../api/industries'
+import { createIndustry, deleteIndustry, getIndustries, updateIndustry } from '../api/industries'
+import { useAuth } from '../auth/useAuth'
 import IndustryModal from '../components/industries/IndustryModal'
+import { ActionMenu, Alert, Badge, Button, EmptyState, PageHeader, TableSkeleton } from '../components/ui'
 
 const alertOptions = {
   confirmButtonColor: '#0B6FF4',
@@ -10,12 +12,14 @@ const alertOptions = {
 }
 
 export default function IndustriesPage() {
+  const { can } = useAuth()
   const [industries, setIndustries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [modalError, setModalError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [editing, setEditing] = useState(null)
   const submitLock = useRef(false)
 
   const load = useCallback(async () => {
@@ -35,12 +39,13 @@ export default function IndustriesPage() {
   const closeModal = useCallback(() => {
     setModalOpen(false)
     setModalError('')
+    setEditing(null)
   }, [])
 
   const save = async (data) => {
     if (submitLock.current) return
     const name = String(data.get('name') || '').trim()
-    const duplicate = industries.some((industry) => industry.name.trim().toLowerCase() === name.toLowerCase())
+    const duplicate = industries.some((industry) => industry.id !== editing?.id && industry.name.trim().toLowerCase() === name.toLowerCase())
     if (duplicate) {
       setModalError('Industry with this name already exists.')
       return
@@ -50,11 +55,11 @@ export default function IndustriesPage() {
     setSaving(true)
     setModalError('')
     try {
-      const response = await createIndustry(data)
+      const response = editing ? await updateIndustry(editing.id, data) : await createIndustry(data)
       if (!response?.data?.id) throw new Error('The server did not confirm that the industry was added.')
-      setIndustries((current) => [...current, response.data].sort((a, b) => a.name.localeCompare(b.name)))
+      setIndustries((current) => (editing ? current.map((item) => item.id === editing.id ? response.data : item) : [...current, response.data]).sort((a, b) => a.name.localeCompare(b.name)))
       closeModal()
-      await Swal.fire({ ...alertOptions, icon: 'success', title: 'Industry added', text: 'Industry added successfully.', timer: 1600, timerProgressBar: true })
+      await Swal.fire({ ...alertOptions, icon: 'success', title: editing ? 'Industry updated' : 'Industry added', text: response.message, timer: 1600, timerProgressBar: true })
     } catch (requestError) {
       setModalError(requestError.message)
     } finally {
@@ -63,16 +68,25 @@ export default function IndustriesPage() {
     }
   }
 
+  const remove = async (industry) => {
+    const result = await Swal.fire({ ...alertOptions, icon: 'warning', title: `Delete ${industry.name}?`, text: 'This cannot be undone. Industries assigned to services must be deactivated instead.', showCancelButton: true, confirmButtonText: 'Delete Industry', confirmButtonColor: '#dc2626' })
+    if (!result.isConfirmed) return
+    try {
+      const response = await deleteIndustry(industry.id)
+      setIndustries((current) => current.filter((item) => item.id !== industry.id))
+      await Swal.fire({ ...alertOptions, icon: 'success', title: 'Industry deleted', text: response.message, timer: 1500, timerProgressBar: true })
+    } catch (requestError) {
+      await Swal.fire({ ...alertOptions, icon: 'error', title: 'Unable to delete industry', text: requestError.message })
+    }
+  }
+
   return <section>
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div><h1 className="text-xl font-bold">Industries</h1><p className="mt-1 text-sm text-slate-500">Manage industries available in the marketplace.</p></div>
-      <button onClick={() => { setModalError(''); setModalOpen(true) }} className="flex h-9 items-center gap-2 rounded-md bg-primary px-3.5 text-xs font-semibold text-white hover:bg-blue-700"><Plus className="h-4 w-4"/>Add Industry</button>
-    </div>
+    <PageHeader eyebrow="Marketplace catalog" title="Industries" description="Manage industries available in the marketplace." actions={can('industries.create') && <Button icon={Plus} onClick={() => { setEditing(null); setModalError(''); setModalOpen(true) }}>Add Industry</Button>}/>
 
-    {error && <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}<button onClick={load} className="ml-2 font-semibold underline">Retry</button></div>}
+    {error && <Alert className="mt-5">{error}<button type="button" onClick={load} className="ml-2 font-semibold underline">Retry</button></Alert>}
 
-    {loading ? <div className="mt-6 grid min-h-52 place-items-center rounded-lg border bg-white text-xs text-slate-500">Loading industries...</div> : industries.length === 0 ? <div className="mt-6 grid min-h-60 place-items-center rounded-lg border bg-white text-center shadow-subtle"><div><span className="mx-auto grid h-11 w-11 place-items-center rounded-md bg-slate-100 text-slate-500"><Factory className="h-5 w-5"/></span><h2 className="mt-3 text-sm font-semibold">No industries added</h2><p className="mt-1 text-xs text-slate-500">Use Add Industry to create the first industry.</p></div></div> : <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{industries.map((industry) => <article key={industry.id} className="flex items-start gap-4 rounded-lg border bg-white p-4 shadow-subtle">{industry.logo_url ? <img src={industry.logo_url} alt="" className="h-14 w-14 rounded-md border object-contain"/> : <span className="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-slate-100 text-slate-400"><Factory className="h-5 w-5"/></span>}<div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="truncate text-sm font-bold text-slate-800">{industry.name}</h2><span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${industry.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{industry.status === 'active' ? 'Active' : 'Deactive'}</span></div>{industry.description && <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{industry.description}</p>}<p className="mt-1 text-[11px] text-slate-400">Added {new Date(industry.created_at).toLocaleDateString()}</p></div></article>)}</div>}
+    {loading ? <div className="mt-6"><TableSkeleton columns={6}/></div> : industries.length === 0 ? <div className="mt-6 rounded-xl border bg-white"><EmptyState icon={Factory} title="No industries added" description="Use Add Industry to create the first industry." action={can('industries.create') && <Button icon={Plus} onClick={() => setModalOpen(true)}>Add Industry</Button>}/></div> : <div className="ui-table-shell mt-6 overflow-x-auto"><table className="w-full min-w-[820px] text-left"><thead className="bg-slate-50"><tr><th className="w-20">Logo</th><th>Industry</th><th>Description</th><th className="w-28">Status</th><th className="w-36">Date added</th>{can('industries.update') || can('industries.delete') ? <th className="w-20 text-right">Actions</th> : null}</tr></thead><tbody>{industries.map((industry) => <tr key={industry.id}><td>{industry.logo_url ? <img src={industry.logo_url} alt={`${industry.name} logo`} className="h-10 w-10 rounded-lg border bg-white object-contain p-1"/> : <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 text-slate-400"><Factory className="h-4 w-4"/></span>}</td><td><p className="text-[13px] font-semibold text-slate-900">{industry.name}</p><p className="mt-0.5 text-[11px] text-slate-400">ID #{industry.id}</p></td><td className="max-w-xl text-[13px] leading-5 text-slate-500">{industry.description || <span className="text-slate-400">No description provided</span>}</td><td><Badge tone={industry.status === 'active' ? 'success' : 'neutral'}>{industry.status === 'active' ? 'Active' : 'Inactive'}</Badge></td><td className="whitespace-nowrap text-[13px] text-slate-500">{industry.created_at ? new Date(industry.created_at).toLocaleDateString() : '—'}</td>{can('industries.update') || can('industries.delete') ? <td className="text-right"><ActionMenu label={`Actions for ${industry.name}`} actions={[can('industries.update') && { label: 'Edit industry', icon: Pencil, onClick: () => { setEditing(industry); setModalError(''); setModalOpen(true) } }, can('industries.delete') && { label: 'Delete industry', icon: Trash2, tone: 'danger', onClick: () => remove(industry) }]}/></td> : null}</tr>)}</tbody></table></div>}
 
-    <IndustryModal open={modalOpen} saving={saving} serverError={modalError} onClearError={() => setModalError('')} onClose={closeModal} onSave={save}/>
+    <IndustryModal open={modalOpen} industry={editing} saving={saving} serverError={modalError} onClearError={() => setModalError('')} onClose={closeModal} onSave={save}/>
   </section>
 }

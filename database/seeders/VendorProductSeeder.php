@@ -43,9 +43,10 @@ class VendorProductSeeder extends Seeder
                 'name' => $data['contact'],
                 'username' => 'vendor'.($index + 1),
                 'password' => Hash::make('Vendor@123'),
-                'role' => 'vendor',
+                'account_type' => 'vendor',
                 'email_verified_at' => now(),
             ]);
+            $user->syncRoles(['Vendor']);
 
             $vendor = Vendor::updateOrCreate(['email' => $data['email']], [
                 'user_id' => $user->id,

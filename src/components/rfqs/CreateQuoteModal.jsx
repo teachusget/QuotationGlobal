@@ -1,5 +1,6 @@
 import { FileText, Image, Paperclip, Plus, Save, Trash2, Truck, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import useDialogAccessibility from '../../hooks/useDialogAccessibility'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const addDays = (days) => { const date = new Date(); date.setDate(date.getDate() + days); return date.toISOString().slice(0, 10) }
@@ -14,6 +15,10 @@ function AddressCard({ title, name, setName, email, setEmail }) {
 }
 
 export default function CreateQuoteModal({ request, saving, error, onClose, onSend }) {
+  const [touched, setTouched] = useState(false)
+  const closeEditor = () => { if (touched && !window.confirm('Discard this unsaved quotation?')) return; onClose() }
+  const dialogRef = useDialogAccessibility(true, closeEditor, saving)
+  useEffect(() => { if (!touched) return undefined; const warn = (event) => { event.preventDefault(); event.returnValue = '' }; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn) }, [touched])
   const [quotationNo, setQuotationNo] = useState(`Q-${String(request.id).padStart(5, '0')}`)
   const [quotationDate, setQuotationDate] = useState(today())
   const [dueDate, setDueDate] = useState(request.quote_valid_until?.slice(0, 10) || addDays(30))
@@ -54,8 +59,8 @@ export default function CreateQuoteModal({ request, saving, error, onClose, onSe
   }
 
   return <div className="fixed inset-0 z-[90] overflow-y-auto bg-slate-100/95 backdrop-blur-sm">
-    <form onSubmit={submit} className="mx-auto min-h-screen w-full max-w-6xl px-4 py-8 sm:px-6">
-      <div className="mb-7 flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-primary">RFQ #{request.id}</p><h1 className="mt-2 text-3xl font-bold text-slate-900">Create Your Quotation</h1><div className="mt-4 flex items-center gap-3 text-xs"><span className="grid h-6 w-6 place-items-center rounded-full bg-primary font-bold text-white">1</span><b>Quotation Details</b><span className="h-px w-10 bg-slate-300"/><span className="grid h-6 w-6 place-items-center rounded-full border text-slate-500">2</span><span className="text-slate-500">Review & Share</span></div></div><button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full border bg-white text-slate-500 shadow-sm hover:text-slate-900"><X className="h-5 w-5"/></button></div>
+    <form ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="create-quote-title" onChange={() => setTouched(true)} onSubmit={submit} className="mx-auto min-h-screen w-full max-w-6xl px-4 py-5 sm:px-6 sm:py-8">
+      <div className="mb-7 flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-primary">RFQ #{request.id}</p><h1 id="create-quote-title" className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">Create Your Quotation</h1><div className="mt-4 flex items-center gap-3 text-xs"><span className="grid h-6 w-6 place-items-center rounded-full bg-primary font-bold text-white">1</span><b>Quotation Details</b><span className="h-px w-10 bg-slate-300"/><span className="grid h-6 w-6 place-items-center rounded-full border text-slate-500">2</span><span className="text-slate-500">Review & Share</span></div></div><button type="button" onClick={closeEditor} className="grid h-10 w-10 place-items-center rounded-full border bg-white text-slate-500 shadow-sm hover:text-slate-900"><X className="h-5 w-5"/></button></div>
 
       <div className="rounded-2xl border bg-white p-5 shadow-subtle sm:p-8">
         <div className="mb-7 flex items-center justify-center gap-2"><FileText className="h-6 w-6 text-primary"/><h2 className="border-b border-dashed text-2xl font-bold">Quotation</h2></div>

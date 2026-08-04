@@ -10,7 +10,7 @@ class ExcludeBuyerAccount
 {
     public function handle(Request $request, Closure $next): Response
     {
-        abort_if($request->user()?->role === 'buyer', 403, 'Buyer accounts can only access the marketplace.');
+        abort_if($request->user()?->account_type === 'buyer', 403, 'Buyer accounts can only access the marketplace.');
 
         return $next($request);
     }

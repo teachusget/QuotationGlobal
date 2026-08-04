@@ -24,11 +24,19 @@ import SpecificationTemplatesPage from '../pages/SpecificationTemplatesPage'
 import ComparePage from '../pages/ComparePage'
 import PublicMarketplaceLayout from '../components/layout/PublicMarketplaceLayout'
 import { useAuth } from '../auth/useAuth'
+import PermissionRoute from '../auth/PermissionRoute'
+import UsersPage from '../pages/UsersPage'
+import RolesPage from '../pages/RolesPage'
+import AuditLogsPage from '../pages/AuditLogsPage'
+import ForbiddenPage from '../pages/ForbiddenPage'
+import ProfilePage from '../pages/ProfilePage'
+import CompanyProfilePage from '../pages/CompanyProfilePage'
+import AccountSettingsPage from '../pages/AccountSettingsPage'
 
 export default function AppRoutes() {
   const { user } = useAuth()
-  const isVendor = user?.role === 'vendor'
-  const isBuyer = user?.role === 'buyer'
+  const isVendor = user?.account_type === 'vendor'
+  const isBuyer = user?.account_type === 'buyer'
   const isAdmin = !isVendor && !isBuyer
   const categoryPaths = ['/categories', '/sub-categories']
   const implementedPaths = ['/', '/brands', '/industries', '/vendors', '/customers', '/services', '/marketplace', '/rfqs', '/compare', '/specification-templates', ...categoryPaths]
@@ -48,16 +56,23 @@ export default function AppRoutes() {
     <Route element={<ProtectedRoute/>}>
       <Route element={<AppLayout/>}>
         <Route index element={isVendor ? <Navigate to="/vendors" replace/> : isBuyer ? <Navigate to="/marketplace" replace/> : <HomePage/>}/>
-        {isAdmin && categoryPaths.map((path) => <Route key={path} path={path} element={<CategoriesPage/>}/>)}
-        {!isBuyer && <Route path="/brands" element={<BrandsPage/>}/>} 
-        {isAdmin && <Route path="/industries" element={<IndustriesPage/>}/>}
-        {!isBuyer && <Route path="/vendors" element={<VendorsPage/>}/>}
-        {!isBuyer && <Route path="/customers" element={<CustomersPage/>}/>}
-        {!isBuyer && <Route path="/services" element={<ServicesPage/>}/>} 
-        {isAdmin && <Route path="/specification-templates" element={<SpecificationTemplatesPage/>}/>} 
-        <Route path="/demos" element={<DemosPage/>}/>
-        <Route path="/rfqs" element={<RfqsPage/>}/>
-        {(isVendor || isAdmin) && <Route path="/purchase-orders" element={<VendorPurchaseOrdersPage/>}/>}
+        {categoryPaths.map((path) => <Route key={path} path={path} element={<PermissionRoute permission="categories.view"><CategoriesPage/></PermissionRoute>}/>)}
+        <Route path="/brands" element={<PermissionRoute permission="brands.view"><BrandsPage/></PermissionRoute>}/>
+        <Route path="/industries" element={<PermissionRoute permission="industries.view"><IndustriesPage/></PermissionRoute>}/>
+        <Route path="/vendors" element={<PermissionRoute permission="vendors.view"><VendorsPage/></PermissionRoute>}/>
+        <Route path="/customers" element={<PermissionRoute permission="customers.view"><CustomersPage/></PermissionRoute>}/>
+        <Route path="/services" element={<PermissionRoute permission="services.view"><ServicesPage/></PermissionRoute>}/>
+        <Route path="/specification-templates" element={<PermissionRoute permission="specifications.view"><SpecificationTemplatesPage/></PermissionRoute>}/>
+        <Route path="/users" element={<PermissionRoute permission="users.view"><UsersPage/></PermissionRoute>}/>
+        <Route path="/roles" element={<PermissionRoute permission="roles.view"><RolesPage/></PermissionRoute>}/>
+        <Route path="/audit-logs" element={<PermissionRoute permission="audit_logs.view"><AuditLogsPage/></PermissionRoute>}/>
+        <Route path="/demos" element={<PermissionRoute permission="demos.view"><DemosPage/></PermissionRoute>}/>
+        <Route path="/rfqs" element={<PermissionRoute permission="rfqs.view"><RfqsPage/></PermissionRoute>}/>
+        <Route path="/purchase-orders" element={<PermissionRoute permission="purchase_orders.view"><VendorPurchaseOrdersPage/></PermissionRoute>}/>
+        <Route path="/forbidden" element={<ForbiddenPage/>}/>
+        <Route path="/profile" element={<ProfilePage/>}/>
+        <Route path="/company-profile" element={<CompanyProfilePage/>}/>
+        <Route path="/account-settings" element={<AccountSettingsPage/>}/>
         {isAdmin && placeholderItems.map((item) => <Route key={item.path} path={item.path} element={<PlaceholderPage/>}/>)}
       </Route>
     </Route>

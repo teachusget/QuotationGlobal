@@ -13,7 +13,7 @@ class BrandController extends Controller
     public function index(Request $request)
     {
         $query = Brand::orderBy('name');
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendorId = \App\Models\Vendor::where('user_id', $request->user()->id)->value('id');
             $query->where(fn ($brands) => $brands->where('status', 'approved')->orWhere('vendor_id', $vendorId));
         }
@@ -29,7 +29,7 @@ class BrandController extends Controller
     public function store(Request $request)
     {
         $data = $this->validated($request);
-        $vendor = $request->user()->role === 'vendor' ? \App\Models\Vendor::where('user_id', $request->user()->id)->firstOrFail() : null;
+        $vendor = $request->user()->account_type === 'vendor' ? \App\Models\Vendor::where('user_id', $request->user()->id)->firstOrFail() : null;
         $item = Brand::create([...$this->attributes($data), 'vendor_id' => $vendor?->id, 'status' => $vendor ? 'pending' : 'approved']);
 
         return response()->json(['message' => $vendor ? 'Brand submitted for admin approval.' : 'Saved successfully.', 'data' => $this->resource($item)], 201);

@@ -53,6 +53,37 @@ class IndustryController extends Controller
         ], 201);
     }
 
+    public function update(Request $request, Industry $industry)
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'status' => ['required', Rule::in(['active', 'deactive'])],
+            'logo_data' => ['nullable', 'string', 'max:2800000', 'regex:#^data:image/(png|jpeg|webp);base64,#'],
+        ]);
+        $name = trim($data['name']);
+        if (Industry::whereKeyNot($industry->id)->whereRaw('LOWER(TRIM(name)) = ?', [Str::lower($name)])->exists()) {
+            throw ValidationException::withMessages(['name' => ['Industry with this name already exists.']]);
+        }
+        $industry->update([
+            'name' => $name,
+            'slug' => $industry->name === $name ? $industry->slug : Str::slug($name).'-'.Str::lower(Str::random(5)),
+            'description' => isset($data['description']) ? trim($data['description']) : null,
+            'status' => $data['status'],
+            ...(array_key_exists('logo_data', $data) ? ['logo_data' => $data['logo_data']] : []),
+        ]);
+        return response()->json(['message' => 'Industry updated successfully.', 'data' => $this->resource($industry->fresh())]);
+    }
+
+    public function destroy(Industry $industry)
+    {
+        if ($industry->services()->exists() || $industry->legacyServices()->exists()) {
+            throw ValidationException::withMessages(['industry' => ['This industry is assigned to services and cannot be deleted. Deactivate it instead.']]);
+        }
+        $industry->delete();
+        return response()->json(['message' => 'Industry deleted successfully.']);
+    }
+
     public function logo(Industry $industry)
     {
         abort_unless(

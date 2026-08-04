@@ -18,7 +18,7 @@ class ServiceController extends Controller
     {
         $query = Service::with(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'industries:id,name', 'brands:id,name', 'images:id,service_id,image_data,sort_order', 'specificationValues.definition'])->latest();
 
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             $query->where('vendor_id', $vendor->id);
         }
@@ -85,7 +85,7 @@ class ServiceController extends Controller
 
     public function rate(Request $request, Service $service)
     {
-        abort_unless($request->user()->role === 'buyer', 403, 'Only customers can rate products.');
+        abort_unless($request->user()->account_type === 'buyer', 403, 'Only customers can rate products.');
         $data = $request->validate([
             'rating' => ['required', 'integer', 'between:1,5'],
             'comment' => ['nullable', 'string', 'max:1000'],
@@ -101,7 +101,7 @@ class ServiceController extends Controller
 
     public function destroy(Request $request, Service $service)
     {
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             abort_unless($service->vendor_id === $vendor->id, 403, 'You can only delete your own service plans.');
         }
@@ -111,7 +111,7 @@ class ServiceController extends Controller
 
     public function update(Request $request, Service $service)
     {
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             abort_unless($service->vendor_id === $vendor->id, 403, 'You can only update your own service plans.');
         }
@@ -128,7 +128,7 @@ class ServiceController extends Controller
         abort_unless(Category::whereKey($data['subcategory_id'])->where('parent_id', $data['category_id'])->exists(), 422, 'Selected subcategory does not belong to this category.');
 
         $original = ['vendor_id' => $service->vendor_id, 'name' => $service->name, 'service_type' => $service->service_type];
-        $targetVendorId = $request->user()->role === 'vendor' ? $service->vendor_id : (int) ($data['vendor_id'] ?? 0);
+        $targetVendorId = $request->user()->account_type === 'vendor' ? $service->vendor_id : (int) ($data['vendor_id'] ?? 0);
         abort_unless($targetVendorId && Vendor::whereKey($targetVendorId)->exists(), 422, 'Select a valid vendor for this service.');
         $this->validateBillingCyclesForType($data);
         $multipliers = ['hourly' => 1, 'daily' => 1, 'monthly' => 1, 'quarterly' => 3, 'semi_annual' => 6, 'annual' => 12];
@@ -187,7 +187,7 @@ class ServiceController extends Controller
             'specifications' => ['nullable', 'array'],
             'specifications.*' => ['nullable', 'string', 'max:1000'],
         ]);
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
         } else {
             abort_unless(!empty($data['vendor_id']), 422, 'Select the vendor for this service.');
@@ -238,7 +238,7 @@ class ServiceController extends Controller
 
     private function authorizeServiceOwner(Request $request, Service $service): void
     {
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             abort_unless($service->vendor_id === $vendor->id, 403, 'You can only manage your own services.');
         }

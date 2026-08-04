@@ -1,0 +1,15 @@
+import { authHeaders } from '../auth/session'
+async function request(path, options = {}) { const response = await fetch(`/api/${path}`, { ...options, headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...authHeaders(), ...options.headers } }); const data = await response.json().catch(() => ({})); if (!response.ok) { const message = data.errors ? Object.values(data.errors).flat()[0] : data.message; throw new Error(message || 'Request failed.'); } return data }
+const body = (method, payload) => ({ method, body: JSON.stringify(payload) })
+export const getUsers = (params = {}) => request(`users?${new URLSearchParams(Object.entries(params).filter(([,v]) => v !== '' && v != null))}`)
+export const createUser = (payload) => request('users', body('POST', payload))
+export const updateUser = (id, payload) => request(`users/${id}`, body('PUT', payload))
+export const setUserStatus = (id, active) => request(`users/${id}/status`, body('PATCH', { active }))
+export const syncUserRoles = (id, roles) => request(`users/${id}/roles`, body('PATCH', { roles }))
+export const inviteUser = (id) => request(`users/${id}/invite`, { method: 'POST' })
+export const resetUserPassword = (id) => request(`users/${id}/reset-password`, { method: 'POST' })
+export const getRoles = () => request('roles')
+export const saveRole = (role, payload) => request(role?.id ? `roles/${role.id}` : 'roles', body(role?.id ? 'PUT' : 'POST', payload))
+export const deleteRole = (id) => request(`roles/${id}`, { method: 'DELETE' })
+export const getPermissions = () => request('permissions')
+export const getAuditLogs = (params = {}) => request(`audit-logs?${new URLSearchParams(Object.entries(params).filter(([,v]) => v))}`)

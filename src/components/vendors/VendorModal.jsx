@@ -1,5 +1,6 @@
 import { ChevronDown, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import useDialogAccessibility from '../../hooks/useDialogAccessibility'
 
 const typeLabels = {
   freelancer: 'Freelancer',
@@ -73,7 +74,7 @@ function SearchableSelect({ label, name, value, options, onChange, required = fa
       <span className={value ? 'text-slate-900' : 'text-slate-400'}>{value || placeholder}</span>
       <ChevronDown className="h-4 w-4 text-slate-400"/>
     </button>
-    {open && !disabled && <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border bg-white shadow-xl">
+    {open && !disabled && <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border bg-white shadow-floating">
       <div className="flex h-10 items-center gap-2 border-b px-3">
         <Search className="h-4 w-4 text-slate-400"/>
         <input id={`vendor-${name}-search`} autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${label.toLowerCase()}`} className="min-w-0 flex-1 text-sm outline-none"/>
@@ -88,23 +89,17 @@ function SearchableSelect({ label, name, value, options, onChange, required = fa
 export default function VendorModal({ open, registrationType, vendor, saving, serverError, onClose, onSave, onClearError }) {
   const [form, setForm] = useState(initialForm)
   const [error, setError] = useState('')
+  const baseline = { ...initialForm, ...Object.fromEntries(Object.keys(initialForm).map((key) => [key, vendor?.[key] || ''])), password: '', password_confirmation: '', status: vendor?.status || 'pending_approval' }
+  const dirty = open && JSON.stringify(form) !== JSON.stringify(baseline)
+  const requestClose = () => { if (dirty && !window.confirm('Discard your unsaved vendor changes?')) return; onClose() }
+  const dialogRef = useDialogAccessibility(open, requestClose, saving)
+  useEffect(() => { if (!dirty) return undefined; const warn = (event) => { event.preventDefault(); event.returnValue = '' }; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn) }, [dirty])
 
   useEffect(() => {
     if (!open) return
     setForm({ ...initialForm, ...Object.fromEntries(Object.keys(initialForm).map((key) => [key, vendor?.[key] || ''])), password: '', password_confirmation: '', status: vendor?.status || 'pending_approval' })
     setError('')
   }, [open, registrationType, vendor])
-
-  useEffect(() => {
-    if (!open) return
-    const closeOnEscape = (event) => event.key === 'Escape' && !saving && onClose()
-    document.addEventListener('keydown', closeOnEscape)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', closeOnEscape)
-      document.body.style.overflow = ''
-    }
-  }, [open, onClose, saving])
 
   if (!open) return null
 
@@ -151,11 +146,11 @@ export default function VendorModal({ open, registrationType, vendor, saving, se
   const cityOptions = form.country ? countryCities[form.country] || [] : []
 
   return <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-    <button className="absolute inset-0 bg-slate-950/45" onClick={() => !saving && onClose()} aria-label="Close modal"/>
-    <div role="dialog" aria-modal="true" aria-labelledby="vendor-modal-title" className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white shadow-xl">
+    <button className="absolute inset-0 bg-slate-950/45" onClick={() => !saving && requestClose()} aria-label="Close modal"/>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="vendor-modal-title" className="relative max-h-[94dvh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-overlay sm:max-h-[92vh]">
       <div className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-white px-5">
         <div><h2 id="vendor-modal-title" className="text-base font-bold">{vendor ? 'Edit' : 'Register as'} {typeLabels[registrationType]}</h2><p className="mt-0.5 text-[11px] text-slate-500">Enter the registration details below.</p></div>
-        <button type="button" onClick={onClose} disabled={saving} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50" aria-label="Close"><X className="h-4 w-4"/></button>
+        <button type="button" onClick={requestClose} disabled={saving} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50" aria-label="Close"><X className="h-4 w-4"/></button>
       </div>
 
       <form onSubmit={submit} className="p-5">
@@ -190,7 +185,7 @@ export default function VendorModal({ open, registrationType, vendor, saving, se
         {visibleError && <p role="alert" className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{visibleError}</p>}
 
         <div className="mt-6 flex justify-end gap-2 border-t pt-4">
-          <button type="button" onClick={onClose} disabled={saving} className="h-9 rounded-md border px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+          <button type="button" onClick={requestClose} disabled={saving} className="h-9 rounded-md border px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
           <button disabled={saving} className="h-9 rounded-md bg-primary px-4 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60">{saving ? 'Saving...' : vendor ? 'Update Registration' : 'Save Registration'}</button>
         </div>
       </form>

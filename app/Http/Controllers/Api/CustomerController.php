@@ -7,12 +7,12 @@ use Illuminate\Http\Request;
 class CustomerController extends Controller {
     public function index(Request $request) {
         $vendorId = null;
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendorId = Vendor::where('user_id', $request->user()->id)->firstOrFail()->id;
         }
 
         $scopeVendor = fn ($query) => $vendorId ? $query->where('vendor_id', $vendorId) : $query;
-        $customers = User::where('role', 'buyer')
+        $customers = User::where('account_type', 'buyer')
             ->when($vendorId, fn ($query) => $query->where(function ($customers) use ($vendorId) {
                 $customers->whereHas('purchaseOrders', fn ($orders) => $orders->where('vendor_id', $vendorId)->whereNotNull('sent_at'))
                     ->orWhereHas('demoRequests', fn ($demos) => $demos->where('vendor_id', $vendorId)->where('request_type', 'demo')->where('status', 'accepted'));
@@ -36,7 +36,7 @@ class CustomerController extends Controller {
     }
 
     public function setBlocked(Request $request, User $customer) {
-        abort_unless($customer->role === 'buyer', 422, 'Only customer accounts can be blocked.');
+        abort_unless($customer->account_type === 'buyer', 422, 'Only customer accounts can be blocked.');
         $data = $request->validate(['blocked' => ['required', 'boolean']]);
         $customer->update(['is_blocked' => $data['blocked']]);
         if ($data['blocked']) $customer->tokens()->delete();
@@ -44,7 +44,7 @@ class CustomerController extends Controller {
     }
 
     public function destroy(User $customer) {
-        abort_unless($customer->role === 'buyer', 422, 'Only customer accounts can be deleted.');
+        abort_unless($customer->account_type === 'buyer', 422, 'Only customer accounts can be deleted.');
         $customer->tokens()->delete();
         $customer->delete();
         return response()->json(['message' => 'Customer deleted permanently.']);

@@ -21,17 +21,17 @@ class DemoRequestController extends Controller
     {
         $query = DemoRequest::with(['service:id,name,billing_cycle', 'vendor:id,user_id,company_name,name', 'user:id,name,email'])->where('request_type', 'demo')->latest();
 
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             $query->where('vendor_id', $vendor->id);
-        } elseif ($request->user()->role === 'buyer') {
+        } elseif ($request->user()->account_type === 'buyer') {
             $query->where('user_id', $request->user()->id);
         }
 
         $requests = $query->get();
-        $readColumn = $request->user()->role === 'vendor'
+        $readColumn = $request->user()->account_type === 'vendor'
             ? 'vendor_read_at'
-            : ($request->user()->role === 'buyer' ? 'buyer_read_at' : 'admin_read_at');
+            : ($request->user()->account_type === 'buyer' ? 'buyer_read_at' : 'admin_read_at');
         $requests->each(function ($demoRequest) use ($readColumn) {
             $demoRequest->unread_count = $demoRequest->messages()->whereNull($readColumn)->count();
             $demoRequest->status_unread = in_array($demoRequest->status, ['accepted', 'rejected'], true)
@@ -50,10 +50,10 @@ class DemoRequestController extends Controller
             'purchaseOrder',
         ])->where('request_type', 'quote')->latest();
 
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             $query->where('vendor_id', $vendor->id);
-        } elseif ($request->user()->role === 'buyer') {
+        } elseif ($request->user()->account_type === 'buyer') {
             $query->where('user_id', $request->user()->id);
         }
 
@@ -64,7 +64,7 @@ class DemoRequestController extends Controller
 
     public function sendQuote(Request $request, DemoRequest $demoRequest)
     {
-        abort_unless($request->user()->role === 'vendor', 403, 'Only the assigned vendor can send a quote.');
+        abort_unless($request->user()->account_type === 'vendor', 403, 'Only the assigned vendor can send a quote.');
         $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
         abort_unless($demoRequest->request_type === 'quote' && $demoRequest->vendor_id === $vendor->id, 403);
         $data = $request->validate([
@@ -104,7 +104,7 @@ class DemoRequestController extends Controller
 
     public function respondToQuote(Request $request, DemoRequest $demoRequest)
     {
-        abort_unless($request->user()->role === 'buyer' && $demoRequest->request_type === 'quote' && $demoRequest->user_id === $request->user()->id, 403);
+        abort_unless($request->user()->account_type === 'buyer' && $demoRequest->request_type === 'quote' && $demoRequest->user_id === $request->user()->id, 403);
         abort_unless($demoRequest->status === 'quoted', 422, 'This quote is no longer awaiting a response.');
         abort_if($demoRequest->quote_valid_until?->isPast(), 422, 'This quote has expired.');
         $data = $request->validate(['decision' => ['required', Rule::in(['accept', 'decline'])]]);
@@ -121,7 +121,7 @@ class DemoRequestController extends Controller
 
     public function generatePurchaseOrder(Request $request, DemoRequest $demoRequest)
     {
-        abort_unless($request->user()->role === 'buyer' && $demoRequest->request_type === 'quote' && $demoRequest->user_id === $request->user()->id, 403);
+        abort_unless($request->user()->account_type === 'buyer' && $demoRequest->request_type === 'quote' && $demoRequest->user_id === $request->user()->id, 403);
         abort_unless($demoRequest->status === 'quote_accepted', 422, 'Accept this quote before generating a purchase order.');
         $demoRequest->load(['service:id,name,billing_cycle', 'vendor:id,company_name,name,email,phone,address,city,country', 'user:id,name,email']);
         $quoteData = $demoRequest->quote_data ?? [];
@@ -144,7 +144,7 @@ class DemoRequestController extends Controller
 
     public function sendPurchaseOrder(Request $request, DemoRequest $demoRequest)
     {
-        abort_unless($request->user()->role === 'buyer' && $demoRequest->user_id === $request->user()->id, 403);
+        abort_unless($request->user()->account_type === 'buyer' && $demoRequest->user_id === $request->user()->id, 403);
         abort_unless($demoRequest->status === 'quote_accepted', 422, 'This quote is not accepted.');
         $po = $demoRequest->purchaseOrder()->firstOrFail();
         if ($po->status !== 'sent') $po->update(['status' => 'sent', 'sent_at' => now()]);
@@ -154,10 +154,10 @@ class DemoRequestController extends Controller
     public function purchaseOrdersIndex(Request $request)
     {
         $query = PurchaseOrder::with(['quoteRequest.service:id,name', 'quoteRequest.user:id,name,email', 'vendor:id,company_name,name,email'])->latest('sent_at');
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             $query->where('vendor_id', $vendor->id)->where('status', 'sent');
-        } elseif ($request->user()->role === 'buyer') {
+        } elseif ($request->user()->account_type === 'buyer') {
             $query->where('user_id', $request->user()->id);
         }
         return response()->json(['data' => $query->get()]);
@@ -199,7 +199,7 @@ class DemoRequestController extends Controller
             'rejection_reason' => ['nullable', 'required_if:status,rejected', 'string', 'min:5', 'max:1000'],
         ]);
 
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             abort_unless($demoRequest->vendor_id === $vendor->id, 403, 'You can only update requests for your own products.');
         }
@@ -235,7 +235,7 @@ class DemoRequestController extends Controller
 
     public function markBuyerNotificationsRead(Request $request)
     {
-        abort_unless($request->user()->role === 'buyer', 403);
+        abort_unless($request->user()->account_type === 'buyer', 403);
         DemoRequest::where('user_id', $request->user()->id)
             ->whereIn('status', ['accepted', 'rejected', 'quoted'])
             ->whereNull('buyer_notification_read_at')
@@ -249,12 +249,12 @@ class DemoRequestController extends Controller
         $this->authorizeParticipant($request, $demoRequest);
         abort_unless($demoRequest->status === 'accepted', 403, 'Chat becomes available after the demo request is accepted.');
 
-        $readColumn = $request->user()->role === 'vendor'
+        $readColumn = $request->user()->account_type === 'vendor'
             ? 'vendor_read_at'
-            : ($request->user()->role === 'buyer' ? 'buyer_read_at' : 'admin_read_at');
+            : ($request->user()->account_type === 'buyer' ? 'buyer_read_at' : 'admin_read_at');
         $demoRequest->messages()->whereNull($readColumn)->update([$readColumn => now()]);
 
-        return response()->json(['data' => $demoRequest->messages()->with('user:id,name,role')->oldest()->get()]);
+        return response()->json(['data' => $demoRequest->messages()->with('user:id,name,account_type')->oldest()->get()]);
     }
 
     public function sendMessage(Request $request, DemoRequest $demoRequest)
@@ -262,8 +262,8 @@ class DemoRequestController extends Controller
         $this->authorizeParticipant($request, $demoRequest);
         abort_unless($demoRequest->status === 'accepted', 403, 'Chat becomes available after the demo request is accepted.');
         abort_if(
-            in_array($request->user()->role, ['vendor', 'buyer'], true)
-                && ($request->user()->role === 'vendor' ? $demoRequest->vendor_chat_blocked : $demoRequest->buyer_chat_blocked),
+            in_array($request->user()->account_type, ['vendor', 'buyer'], true)
+                && ($request->user()->account_type === 'vendor' ? $demoRequest->vendor_chat_blocked : $demoRequest->buyer_chat_blocked),
             403,
             'Your messaging access for this conversation has been stopped by an administrator.'
         );
@@ -292,12 +292,12 @@ class DemoRequestController extends Controller
             'attachment_type' => $data['attachment_type'] ?? null,
             'attachment_name' => $data['attachment_name'] ?? null,
             'attachment_data' => $data['attachment_data'] ?? null,
-            ...($request->user()->role === 'vendor'
+            ...($request->user()->account_type === 'vendor'
                 ? ['vendor_read_at' => now()]
-                : ($request->user()->role === 'buyer' ? ['buyer_read_at' => now()] : ['admin_read_at' => now()])),
+                : ($request->user()->account_type === 'buyer' ? ['buyer_read_at' => now()] : ['admin_read_at' => now()])),
         ]);
 
-        return response()->json(['data' => $message->load('user:id,name,role')], 201);
+        return response()->json(['data' => $message->load('user:id,name,account_type')], 201);
     }
 
     public function moderate(Request $request, DemoRequest $demoRequest)
@@ -317,11 +317,11 @@ class DemoRequestController extends Controller
 
     private function authorizeParticipant(Request $request, DemoRequest $demoRequest): void
     {
-        if (! in_array($request->user()->role, ['vendor', 'buyer'], true)) {
+        if (! in_array($request->user()->account_type, ['vendor', 'buyer'], true)) {
             return;
         }
 
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             abort_unless($demoRequest->vendor_id === $vendor->id, 403);
             return;

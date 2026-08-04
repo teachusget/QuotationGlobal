@@ -20,6 +20,9 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
+use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
 class Kernel extends HttpKernel
 {
@@ -53,5 +56,8 @@ class Kernel extends HttpKernel
         'admin' => EnsureAdminAccount::class,
         'not-buyer' => ExcludeBuyerAccount::class,
         'throttle' => ThrottleRequests::class,
+        'permission' => PermissionMiddleware::class,
+        'role' => RoleMiddleware::class,
+        'role_or_permission' => RoleOrPermissionMiddleware::class,
     ];
 }

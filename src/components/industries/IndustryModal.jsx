@@ -1,7 +1,9 @@
 import { ImagePlus, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { Button } from '../ui'
+import useDialogAccessibility from '../../hooks/useDialogAccessibility'
 
-export default function IndustryModal({ open, saving, serverError, onClose, onSave, onClearError }) {
+export default function IndustryModal({ open, industry, saving, serverError, onClose, onSave, onClearError }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [status, setStatus] = useState('active')
@@ -10,33 +12,25 @@ export default function IndustryModal({ open, saving, serverError, onClose, onSa
   const [error, setError] = useState('')
   const fileRef = useRef(null)
   const objectUrlRef = useRef('')
+  const dirty = open && (name !== (industry?.name || '') || description !== (industry?.description || '') || status !== (industry?.status || 'active') || Boolean(logo))
+  const requestClose = () => { if (dirty && !window.confirm('Discard your unsaved changes?')) return; onClose() }
+  const dialogRef = useDialogAccessibility(open, requestClose, saving)
+  useEffect(() => { if (!dirty) return undefined; const warn = (event) => { event.preventDefault(); event.returnValue = '' }; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn) }, [dirty])
 
   useEffect(() => {
     if (!open) return
-    setName('')
-    setDescription('')
-    setStatus('active')
+    setName(industry?.name || '')
+    setDescription(industry?.description || '')
+    setStatus(industry?.status || 'active')
     setLogo(null)
-    setPreview('')
+    setPreview(industry?.logo_url || '')
     setError('')
 
     return () => {
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
       objectUrlRef.current = ''
     }
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const closeOnEscape = (event) => event.key === 'Escape' && !saving && onClose()
-    document.addEventListener('keydown', closeOnEscape)
-    document.body.style.overflow = 'hidden'
-
-    return () => {
-      document.removeEventListener('keydown', closeOnEscape)
-      document.body.style.overflow = ''
-    }
-  }, [open, onClose, saving])
+  }, [open, industry])
 
   if (!open) return null
 
@@ -82,11 +76,11 @@ export default function IndustryModal({ open, saving, serverError, onClose, onSa
   const visibleError = error || serverError
 
   return <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-    <button className="absolute inset-0 bg-slate-950/45" onClick={() => !saving && onClose()} aria-label="Close modal"/>
-    <div role="dialog" aria-modal="true" aria-labelledby="industry-modal-title" className="relative w-full max-w-lg rounded-lg bg-white shadow-xl">
+    <button className="absolute inset-0 bg-slate-950/45" onClick={() => !saving && requestClose()} aria-label="Close modal"/>
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="industry-modal-title" className="relative max-h-[94dvh] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-overlay sm:max-h-[92vh]">
       <div className="flex h-14 items-center justify-between border-b px-5">
-        <h2 id="industry-modal-title" className="text-base font-bold">Add Industry</h2>
-        <button type="button" onClick={onClose} disabled={saving} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50" aria-label="Close"><X className="h-4 w-4"/></button>
+        <h2 id="industry-modal-title" className="text-base font-bold">{industry ? 'Edit Industry' : 'Add Industry'}</h2>
+        <button type="button" onClick={requestClose} disabled={saving} className="rounded-md p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50" aria-label="Close"><X className="h-4 w-4"/></button>
       </div>
       <form onSubmit={submit} className="p-5">
         <div className="space-y-4">
@@ -109,14 +103,14 @@ export default function IndustryModal({ open, saving, serverError, onClose, onSa
             <label className="mb-1.5 block text-xs font-semibold">Logo <span className="font-normal text-slate-400">(optional)</span></label>
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => chooseLogo(event.target.files[0])} className="sr-only"/>
             <button type="button" onClick={() => fileRef.current?.click()} className="flex min-h-28 w-full items-center justify-center rounded-md border border-dashed bg-slate-50 p-3 text-slate-500 hover:border-primary hover:bg-blue-50">
-              {preview ? <img src={preview} alt="Industry logo preview" className="h-20 w-20 rounded-md object-contain"/> : <span className="flex flex-col items-center gap-1.5 text-xs"><ImagePlus className="h-5 w-5"/>Upload PNG, JPG or WebP<span className="text-[10px] text-slate-400">Maximum 2 MB</span></span>}
+              {preview ? <img src={preview} alt="Industry logo preview" className="h-20 w-20 rounded-md object-contain"/> : <span className="flex flex-col items-center gap-1.5 text-xs"><ImagePlus className="h-5 w-5"/>Upload PNG, JPG or WebP<span className="text-[11px] text-slate-400">Maximum 2 MB</span></span>}
             </button>
           </div>
           {visibleError && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{visibleError}</p>}
         </div>
         <div className="mt-6 flex justify-end gap-2 border-t pt-4">
-          <button type="button" onClick={onClose} disabled={saving} className="h-9 rounded-md border px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">Cancel</button>
-          <button disabled={saving} className="h-9 rounded-md bg-primary px-4 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60">{saving ? 'Adding...' : 'Add Industry'}</button>
+          <Button type="button" variant="secondary" onClick={requestClose} disabled={saving}>Cancel</Button>
+          <Button loading={saving}>{industry ? 'Save Changes' : 'Add Industry'}</Button>
         </div>
       </form>
     </div>

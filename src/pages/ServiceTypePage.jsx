@@ -76,21 +76,21 @@ export default function ServiceTypePage() {
       </div>
     </div>
 
-    <div className="mt-7 flex flex-col gap-4 rounded-xl border bg-white p-4 shadow-subtle sm:flex-row sm:items-center">
+    <div className="mt-7 flex flex-col gap-4 ui-toolbar shadow-subtle sm:flex-row sm:items-center">
       <div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${config.label.toLowerCase()}...`} className="h-11 w-full rounded-lg border pl-10 pr-3 text-sm outline-none focus:border-primary"/></div>
       <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><CheckCircle2 className="h-4 w-4 text-emerald-500"/>{visible.length} verified result{visible.length === 1 ? '' : 's'}</div>
     </div>
 
     {error && <p className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">{error}</p>}
-    {loading ? <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{[1, 2, 3].map((item) => <div key={item} className="overflow-hidden rounded-xl border bg-white"><div className="h-48 animate-pulse bg-slate-100"/><div className="space-y-3 p-5"><div className="h-4 w-2/3 animate-pulse rounded bg-slate-100"/><div className="h-3 w-1/2 animate-pulse rounded bg-slate-100"/><div className="h-9 w-28 animate-pulse rounded bg-slate-100"/></div></div>)}</div> : <div className="mt-6 grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
+    {loading ? <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{[1, 2, 3].map((item) => <div key={item} className="ui-table-shell"><div className="h-48 ui-skeleton bg-slate-100"/><div className="space-y-3 p-5"><div className="h-4 w-2/3 ui-skeleton rounded bg-slate-100"/><div className="h-3 w-1/2 ui-skeleton rounded bg-slate-100"/><div className="h-9 w-28 ui-skeleton rounded bg-slate-100"/></div></div>)}</div> : <div className="mt-6 grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
       {visible.map((product) => {
         const plan = product.plans[0]
-        return <Link to={`/marketplace/services/${product.id}`} key={product.id} className="group flex min-w-0 flex-col overflow-hidden rounded-xl border bg-white transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-xl">
+        return <Link to={`/marketplace/services/${product.id}`} key={product.id} className="group flex min-w-0 flex-col ui-table-shell transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-floating">
           <div className="grid h-48 place-items-center overflow-hidden border-b bg-gradient-to-br from-white to-slate-50 p-4">
             {product.images?.[0]?.image_url ? <img src={product.images[0].image_url} alt={product.name} className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"/> : <Boxes className="h-11 w-11 text-primary/40"/>}
           </div>
           <div className="flex flex-1 flex-col p-5">
-            <div className="flex items-center justify-between gap-3"><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-primary">{product.category?.name || config.label}</span><span className="text-[10px] font-semibold text-slate-400">{product.plans.length} plan{product.plans.length === 1 ? '' : 's'}</span></div>
+            <div className="flex items-center justify-between gap-3"><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-primary">{product.category?.name || config.label}</span><span className="text-[11px] font-semibold text-slate-400">{product.plans.length} plan{product.plans.length === 1 ? '' : 's'}</span></div>
             <h2 className="mt-3 min-h-10 text-base font-bold text-slate-900 group-hover:text-primary">{product.name}</h2>
             <p className="mt-1 text-xs text-slate-500">by {product.vendor?.company_name || product.vendor?.name || 'Verified vendor'}</p>
             <div className="mt-auto pt-5"><p className="text-sm font-bold text-slate-900">{plan ? `Starting From $${Number(plan.price_from).toLocaleString()}` : 'Price on request'}</p><span className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-xs font-semibold text-white group-hover:bg-blue-700">{product.service_type === 'services' ? 'View service' : 'View product'} <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1"/></span></div>

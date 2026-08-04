@@ -55,3 +55,11 @@ export async function createIndustry(formData) {
     body: await serialize(formData),
   })
 }
+
+export async function updateIndustry(id, formData) {
+  return request(`${API_URL}/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: await serialize(formData) })
+}
+
+export async function deleteIndustry(id) {
+  return request(`${API_URL}/${id}`, { method: 'DELETE' })
+}

@@ -17,7 +17,7 @@ class VendorController extends Controller
     {
         $query = Vendor::with(['user:id', 'industry:id,name', 'serviceCategory:id,name'])->latest();
 
-        if ($request->user()->role === 'vendor') {
+        if ($request->user()->account_type === 'vendor') {
             $query->where('user_id', $request->user()->id);
         }
 
@@ -30,15 +30,16 @@ class VendorController extends Controller
     {
         $data = $this->validatedData($request);
 
-        abort_if($request->user()->role === 'vendor', 403, 'Vendor accounts cannot create other vendors.');
+        abort_if($request->user()->account_type === 'vendor', 403, 'Vendor accounts cannot create other vendors.');
 
         $vendor = DB::transaction(function () use ($data) {
             $user = User::create([
                 'name' => trim($data['name']),
                 'email' => trim($data['email']),
                 'password' => $data['password'],
-                'role' => 'vendor',
+                'account_type' => 'vendor',
             ]);
+            $user->assignRole('Vendor');
 
             return Vendor::create([
                 ...$this->payload($data),
@@ -68,7 +69,8 @@ class VendorController extends Controller
             if ($vendor->user) {
                 $vendor->user->update($account);
             } else {
-                $user = User::create([...$account, 'role' => 'vendor']);
+                $user = User::create([...$account, 'account_type' => 'vendor']);
+                $user->assignRole('Vendor');
                 $vendor->update(['user_id' => $user->id]);
             }
         });
@@ -81,7 +83,7 @@ class VendorController extends Controller
 
     public function destroy(Request $request, Vendor $vendor)
     {
-        abort_if($request->user()->role === 'vendor', 403, 'Vendor accounts cannot delete vendors.');
+        abort_if($request->user()->account_type === 'vendor', 403, 'Vendor accounts cannot delete vendors.');
 
         DB::transaction(function () use ($vendor) {
             $user = $vendor->user;
@@ -170,7 +172,7 @@ class VendorController extends Controller
 
     private function authorizeVendor(Request $request, Vendor $vendor): void
     {
-        if ($request->user()->role === 'vendor' && $vendor->user_id !== $request->user()->id) {
+        if ($request->user()->account_type === 'vendor' && $vendor->user_id !== $request->user()->id) {
             abort(403, 'You can only access your own vendor account.');
         }
     }

@@ -29,6 +29,11 @@ export function saveAuth(user, token, remember = true) {
   other.removeItem(TOKEN_KEY)
 }
 
+export function saveCurrentUser(user) {
+  const storage = storageWithToken()
+  if (storage) storage.setItem(USER_KEY, JSON.stringify(user))
+}
+
 export function clearAuth() {
   for (const storage of [localStorage, sessionStorage]) {
     storage.removeItem(USER_KEY)
