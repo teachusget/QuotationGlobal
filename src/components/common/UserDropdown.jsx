@@ -1,0 +1,30 @@
+import { Building2, LogOut, RotateCcw, Settings, UserRound } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../auth/useAuth'
+import PortalActivityActions from '../layout/PortalActivityActions'
+import { isImpersonating, restoreAdminAuth } from '../../auth/session'
+
+const options = [{ label: 'My Profile', icon: UserRound }, { label: 'Company Profile', icon: Building2 }, { label: 'Account Settings', icon: Settings }]
+export default function UserDropdown() {
+  const [open, setOpen] = useState(false)
+  const root = useRef(null)
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
+  useEffect(() => {
+    const close = (event) => { if (event.key === 'Escape' || (event.type === 'mousedown' && !root.current?.contains(event.target))) setOpen(false) }
+    document.addEventListener('mousedown', close); document.addEventListener('keydown', close)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close) }
+  }, [])
+  const isBuyer = user?.role === 'buyer'
+  const isAdmin = !['buyer', 'vendor'].includes(user?.role)
+  const impersonating = isImpersonating()
+  return <>{!isBuyer && <PortalActivityActions isAdmin={isAdmin}/>}<div className="relative" ref={root}>
+    <button onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="menu" className="flex items-center gap-2 rounded-md p-1 text-left hover:bg-slate-50">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">AU</span>
+      <span className="hidden leading-tight xl:block"><span className="block text-xs font-semibold">{user.name}</span><span className="block text-[10px] text-slate-500">{user.company}</span></span>
+      <svg className="hidden h-3 w-3 xl:block" viewBox="0 0 12 12"><path d="m2.5 4.5 3.5 3 3.5-3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+    </button>
+    {open && <div role="menu" className="absolute right-0 top-11 z-50 w-52 rounded-md border bg-white py-1 shadow-subtle">{impersonating && <><div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-amber-600">Viewing as vendor</div><button role="menuitem" onClick={() => { if (restoreAdminAuth()) window.location.assign('/vendors') }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-semibold text-primary hover:bg-blue-50"><RotateCcw className="h-4 w-4"/>Return to Admin</button><div className="my-1 border-t"/></>}{options.map(({ label, icon: Icon }) => <button role="menuitem" key={label} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"><Icon className="h-4 w-4" />{label}</button>)}<div className="my-1 border-t"/><button role="menuitem" onClick={() => { logout(); navigate('/login', { replace: true }) }} className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"><LogOut className="h-4 w-4"/>Logout</button></div>}
+  </div></>
+}

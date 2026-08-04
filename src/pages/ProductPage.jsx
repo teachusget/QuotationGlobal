@@ -1,0 +1,99 @@
+import { ArrowLeft, CheckCircle2, Star, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { createDemoRequest } from '../api/demoRequests'
+import { getMarketplaceService, getServiceRatings, rateService } from '../api/marketplace'
+import { useAuth } from '../auth/useAuth'
+
+const labels = { hourly: 'Hourly', daily: 'Daily', monthly: 'Monthly', quarterly: 'Quarterly', semi_annual: 'Semi-Annual', annual: 'Annual / Yearly' }
+let currentProductType = ''
+const months = new Proxy({ hourly: 1 / 720, daily: 1 / 30, monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }, { get: (target, key) => currentProductType === 'services' ? ({ hourly: 1 / 720, daily: 1 / 30, monthly: 1, annual: 12 }[key]) : target[key] })
+const specificationDisplay = (item) => { if (item.definition?.field_type === 'duration') { try { const duration = JSON.parse(item.value); return `${duration.amount} ${duration.unit}` } catch { return item.value } } return item.value === 'yes' ? 'Yes' : item.value === 'no' ? 'No' : item.value === 'na' ? 'Not applicable' : `${item.value}${item.definition?.unit ? ` ${item.definition.unit}` : ''}` }
+const userRanges = [{ value: '10', label: '1â€“10' }, { value: '50', label: '11â€“50' }, { value: '100', label: '51â€“100' }, { value: '250', label: '101â€“250' }, { value: '500', label: '251â€“500' }, { value: '1000000', label: '500+' }]
+
+export default function ProductPage() {
+  const { id } = useParams()
+  const navigate = useNavigate(); const { user } = useAuth()
+  const [service, setService] = useState(null)
+  const [plans, setPlans] = useState([])
+  const [imageIndex, setImageIndex] = useState(0)
+  const [selectedPlan, setSelectedPlan] = useState(null)
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [demoOpen, setDemoOpen] = useState(false)
+  const [demoAt, setDemoAt] = useState('')
+  const [quoteOpen, setQuoteOpen] = useState(false)
+  const [quotePurpose, setQuotePurpose] = useState('')
+  const [expectedUsers, setExpectedUsers] = useState('')
+  const [ratings, setRatings] = useState({ average: 0, count: 0, ratings: [] })
+  const [myRating, setMyRating] = useState(0)
+  const [review, setReview] = useState('')
+  const [ratingSaving, setRatingSaving] = useState(false)
+  const [ratingMessage, setRatingMessage] = useState('')
+
+  useEffect(() => {
+    getMarketplaceService(id).then((result) => {
+      currentProductType = result.service?.service_type || ''
+      setService(result.service)
+      setPlans(result.plans || [])
+      setSelectedPlan(result.plans?.[0] || result.service)
+    })
+    getServiceRatings(id).then(setRatings).catch(() => {})
+  }, [id])
+
+  const saveRating = async (event) => {
+    event.preventDefault(); setRatingSaving(true); setRatingMessage('')
+    try { const result = await rateService(id, { rating: myRating, comment: review.trim() }); setRatingMessage(result.message); setRatings(await getServiceRatings(id)) } catch (error) { setRatingMessage(error.message) } finally { setRatingSaving(false) }
+  }
+
+  const requireLogin = () => { if (user) return true; navigate('/login', { state: { from: { pathname: `/marketplace/services/${id}` } } }); return false }
+  const openDemoModal = () => { if (!requireLogin()) return; setMessage(''); setDemoAt(''); setDemoOpen(true) }
+  const requestQuote = () => { if (!requireLogin()) return; setMessage(''); setQuotePurpose(''); setExpectedUsers(''); setQuoteOpen(true) }
+  const sendRequest = async (requestType) => {
+    setSending(true); setMessage('')
+    try {
+      const result = await createDemoRequest({ service_id: selectedPlan.id, request_type: requestType, ...(requestType === 'demo' ? { demo_at: demoAt } : { quote_purpose: quotePurpose.trim(), expected_users: Number(expectedUsers) }) })
+      setMessage(result.message)
+      if (requestType === 'demo') setDemoOpen(false)
+      if (requestType === 'quote') setQuoteOpen(false)
+    } catch (err) { setMessage(err.message) } finally { setSending(false) }
+  }
+
+  if (!service || !selectedPlan) return <p className="text-sm text-slate-500">Loading product...</p>
+
+  const images = (service.images || []).map((image) => ({ ...image, image_data: image.image_url || image.image_data }))
+  const requiresConsultation = ['software', 'services'].includes(service.service_type)
+  const features = String(service.features || '').split(/\r?\n|â€¢|•/).map((item) => item.trim().replace(/^[-*]\s*/, '')).filter(Boolean)
+  const productDetails = [
+    ['Category', service.category?.name],
+    ['Subcategory', service.subcategory?.name],
+    ['Industries', service.industries?.map((item) => item.name).join(', ')],
+    ['Brands', service.brands?.map((item) => item.name).join(', ') || service.brand?.name],
+    ['Solution Type', service.service_type ? service.service_type[0].toUpperCase() + service.service_type.slice(1) : ''],
+    ['AI Enabled', service.ai_enabled ? 'Yes' : 'No'],
+    ['Available Plans', plans.map((plan) => labels[plan.billing_cycle]).filter(Boolean).join(', ')],
+    ...(service.specification_values || []).map((item) => [item.definition?.name, specificationDisplay(item)]),
+  ].filter(([, value]) => value)
+
+  return <section>
+    <Link to="/marketplace" className="inline-flex items-center gap-2 text-xs font-semibold text-primary"><ArrowLeft className="h-4 w-4"/>Back to Marketplace</Link>
+    <div className="mt-5 grid gap-7 rounded-lg border bg-white p-5 lg:grid-cols-2">
+      <div>
+        {images[imageIndex]?.image_data ? <img src={images[imageIndex].image_data} alt={service.name} className="h-80 w-full rounded-lg bg-slate-50 object-contain"/> : <div className="grid h-80 place-items-center rounded-lg bg-slate-100 text-sm text-slate-400">No image available</div>}
+        {images.length > 1 && <div className="mt-3 flex gap-2">{images.map((image, index) => <button type="button" key={image.id} onClick={() => setImageIndex(index)} className={`h-14 w-16 overflow-hidden rounded border ${imageIndex === index ? 'border-primary ring-1 ring-primary' : ''}`}><img src={image.image_data} alt="" className="h-full w-full object-cover"/></button>)}</div>}
+      </div>
+      <div>
+        <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold capitalize text-primary">{service.service_type}</span>
+        <h1 className="mt-4 text-2xl font-bold">{service.name}</h1>
+        <p className="mt-2 text-sm text-slate-500">Sold by {service.vendor?.company_name || service.vendor?.name}</p>
+        <div className="mt-6 overflow-hidden rounded-md border"><table className="w-full text-left text-xs"><thead className="bg-slate-50 text-[10px] uppercase text-slate-500"><tr><th className="p-3">Plan</th><th className="p-3">Original</th><th className="p-3">Discount</th><th className="p-3">Payable</th></tr></thead><tbody>{plans.map((plan) => <tr key={plan.id} onClick={() => setSelectedPlan(plan)} className={`cursor-pointer border-t ${selectedPlan.id === plan.id ? 'bg-blue-50' : ''}`}><td className="p-3 font-semibold">{labels[plan.billing_cycle]}</td><td className="p-3">${(Number(plan.monthly_price) * months[plan.billing_cycle]).toLocaleString()}</td><td className="p-3">{Number(plan.discount_percent || 0)}%</td><td className="p-3 font-bold">{plan.pricing_mode === 'flexible_price' ? `Flexible $${Number(plan.price_from).toLocaleString()}` : `$${Number(plan.price_from).toLocaleString()}`}</td></tr>)}</tbody></table></div>
+        {requiresConsultation ? <div className="mt-5 flex flex-wrap gap-3"><button type="button" onClick={openDemoModal} className="h-10 rounded-md bg-primary px-5 text-sm font-semibold text-white">Get Demo</button><button type="button" disabled={sending} onClick={requestQuote} className="h-10 rounded-md border border-primary px-5 text-sm font-semibold text-primary disabled:opacity-60">Get Quote</button></div> : <button type="button" onClick={requireLogin} className="mt-5 h-10 rounded-md bg-primary px-5 text-sm font-semibold text-white">Place Order â€” ${Number(selectedPlan.price_from).toLocaleString()}</button>}
+        {message && <p className="mt-3 text-xs font-medium text-emerald-700">{message}</p>}
+      </div>
+    </div>
+    <section className="mt-6 rounded-xl border bg-white p-6"><div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-primary">Product information</p><h2 className="mt-1 text-xl font-bold text-slate-900">Features & Details</h2><p className="mt-1 text-xs text-slate-500">Service classification and capabilities provided by the Solution Provider.</p></div><dl className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{productDetails.map(([label, value]) => <div key={label} className="rounded-lg border bg-slate-50 p-4"><dt className="text-[9px] font-bold uppercase tracking-wide text-slate-400">{label}</dt><dd className="mt-1.5 text-sm font-semibold leading-5 text-slate-800">{value}</dd></div>)}</dl>{features.length > 0 && <div className="mt-6 border-t pt-5"><h3 className="text-sm font-bold text-slate-900">Key Features</h3><ul className="mt-3 grid gap-3 sm:grid-cols-2">{features.map((feature, index) => <li key={`${feature}-${index}`} className="flex items-start gap-3 rounded-lg bg-slate-50 p-3 text-sm leading-5 text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"/><span>{feature}</span></li>)}</ul></div>}</section>
+    <section className="mt-6 rounded-xl border bg-white p-6"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-primary">Customer feedback</p><h2 className="mt-1 text-xl font-bold text-slate-900">Ratings & Reviews</h2></div><div className="flex items-center gap-2"><Star className="h-6 w-6 fill-amber-400 text-amber-400"/><b className="text-2xl">{Number(ratings.average || 0).toFixed(1)}</b><span className="text-xs text-slate-400">({ratings.count} {ratings.count === 1 ? 'rating' : 'ratings'})</span></div></div>{user?.role === 'buyer' && <form onSubmit={saveRating} className="mt-5 rounded-lg border bg-slate-50 p-4"><p className="text-xs font-semibold">Rate this product</p><div className="mt-2 flex gap-1" role="radiogroup" aria-label="Product rating">{[1, 2, 3, 4, 5].map((value) => <button key={value} type="button" onClick={() => setMyRating(value)} aria-label={`${value} star${value > 1 ? 's' : ''}`} className="p-1"><Star className={`h-6 w-6 ${value <= myRating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`}/></button>)}</div><textarea value={review} onChange={(event) => setReview(event.target.value)} maxLength={1000} rows="3" placeholder="Share your experience (optional)" className="mt-3 w-full rounded-md border bg-white p-3 text-xs outline-none focus:border-primary"/><div className="mt-3 flex items-center justify-between gap-3"><p className={`text-xs ${ratingMessage.toLowerCase().includes('success') || ratingMessage.toLowerCase().includes('updated') ? 'text-emerald-600' : 'text-red-600'}`}>{ratingMessage}</p><button disabled={!myRating || ratingSaving} className="h-9 rounded-md bg-primary px-4 text-xs font-semibold text-white disabled:opacity-50">{ratingSaving ? 'Saving...' : 'Submit Rating'}</button></div></form>}<div className="mt-5 space-y-3">{ratings.ratings.map((item) => <article key={item.id} className="rounded-lg border p-4"><div className="flex items-center justify-between gap-3"><b className="text-sm">{item.customer_name}</b><div className="flex">{[1, 2, 3, 4, 5].map((value) => <Star key={value} className={`h-4 w-4 ${value <= item.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`}/>)}</div></div>{item.comment && <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-600">{item.comment}</p>}<p className="mt-2 text-[10px] text-slate-400">{new Date(item.created_at).toLocaleDateString()}</p></article>)}{!ratings.ratings.length && <p className="rounded-lg border border-dashed p-8 text-center text-xs text-slate-400">No ratings yet. Be the first customer to rate this product.</p>}</div></section>
+    {demoOpen && <div className="fixed inset-0 z-[80] grid place-items-center p-4"><button type="button" onClick={() => setDemoOpen(false)} className="absolute inset-0 bg-slate-950/45"/><form onSubmit={(event) => { event.preventDefault(); sendRequest('demo') }} className="relative w-full max-w-md rounded-lg bg-white p-5 shadow-xl"><div className="flex items-center justify-between border-b pb-3"><div><h2 className="font-bold">Schedule a Demo</h2><p className="mt-1 text-xs text-slate-500">Choose your preferred date and time for {service.name}.</p></div><button type="button" onClick={() => setDemoOpen(false)} className="p-1 text-slate-500"><X className="h-5 w-5"/></button></div><label className="mt-5 block text-xs font-semibold">Preferred demo date & time *<input required type="datetime-local" value={demoAt} onChange={(event) => setDemoAt(event.target.value)} min={new Date(Date.now() + 60000).toISOString().slice(0, 16)} className="mt-1.5 h-10 w-full rounded-md border px-3 text-sm font-normal"/></label><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setDemoOpen(false)} className="h-9 rounded-md border px-4 text-xs font-semibold">Cancel</button><button disabled={sending} className="h-9 rounded-md bg-primary px-4 text-xs font-semibold text-white disabled:opacity-60">{sending ? 'Sending...' : 'Send Demo Request'}</button></div></form></div>}
+    {quoteOpen && <div className="fixed inset-0 z-[80] grid place-items-center p-4"><button type="button" onClick={() => setQuoteOpen(false)} className="absolute inset-0 bg-slate-950/55" aria-label="Close quote request"/><form onSubmit={(event) => { event.preventDefault(); sendRequest('quote') }} className="relative w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between border-b pb-4"><div><p className="text-[10px] font-bold uppercase tracking-[.16em] text-primary">Request a quotation</p><h2 className="mt-1 text-xl font-bold">{service.name}</h2><p className="mt-1 text-xs text-slate-500">Selected plan: <b>{labels[selectedPlan.billing_cycle] || 'Custom'}</b></p></div><button type="button" onClick={() => setQuoteOpen(false)} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5"/></button></div><div className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-800">These details help the Solution Provider estimate licensing, implementation and support costs accurately.</div><label className="mt-4 block text-xs font-semibold">Purpose / use case *<textarea required minLength={10} maxLength={1500} rows="4" value={quotePurpose} onChange={(event) => setQuotePurpose(event.target.value)} placeholder="Example: We need this software to manage attendance, payroll and employee records across multiple branches." className="mt-1.5 w-full resize-y rounded-md border p-3 text-sm font-normal leading-5 outline-none focus:border-primary"/></label><fieldset className="mt-4"><legend className="text-xs font-semibold">Expected users / employees *</legend><div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">{userRanges.map((range) => <label key={range.value} className={`flex h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs font-semibold transition ${expectedUsers === range.value ? 'border-primary bg-blue-50 text-primary ring-1 ring-primary' : 'text-slate-600 hover:border-blue-300'}`}><input type="checkbox" checked={expectedUsers === range.value} onChange={() => setExpectedUsers(expectedUsers === range.value ? '' : range.value)} className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"/><span>{range.label}</span></label>)}</div><p className="mt-2 text-[10px] text-slate-400">Select one approximate user or employee range.</p></fieldset>{message && <p className="mt-3 rounded-md bg-red-50 p-2 text-xs text-red-600">{message}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setQuoteOpen(false)} className="h-10 rounded-md border px-5 text-xs font-semibold">Cancel</button><button disabled={sending || !expectedUsers} className="h-10 rounded-md bg-primary px-5 text-xs font-semibold text-white disabled:opacity-60">{sending ? 'Sending...' : 'Send Quote Request'}</button></div></form></div>}
+  </section>
+}

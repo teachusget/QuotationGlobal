@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { @apply border-slate-200; }
+  html { @apply bg-canvas; }
+  body { @apply m-0 min-w-0 overflow-x-hidden bg-canvas font-sans text-slate-900 antialiased; letter-spacing: 0; }
+  button, input, select { letter-spacing: 0; }
+  :focus-visible { @apply outline-none ring-2 ring-primary ring-offset-2; }
+}
+
+@layer utilities {
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+  .brand-marquee-track { animation: brand-marquee 28s linear infinite; }
+  .brand-marquee:hover .brand-marquee-track { animation-play-state: paused; }
+}
+
+@keyframes brand-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-marquee-track { animation-play-state: paused; }
+}
+
+/* Admin and vendor dashboard dark theme. Existing utility colors are mapped here
+   so every current module, modal and data table follows the selected appearance. */
+html.dark, html.dark body { background: #08111f; color: #e2e8f0; }
+html.dark .bg-canvas { background-color: #08111f; }
+html.dark .bg-white { background-color: #101b2d; }
+html.dark .bg-slate-50 { background-color: #0c1728; }
+html.dark .bg-slate-100 { background-color: #17243a; }
+html.dark .bg-blue-50, html.dark .bg-blue-50\/60 { background-color: rgba(30, 64, 175, .18); }
+html.dark .bg-emerald-50 { background-color: rgba(5, 150, 105, .16); }
+html.dark .bg-red-50 { background-color: rgba(220, 38, 38, .16); }
+html.dark .bg-amber-50 { background-color: rgba(217, 119, 6, .17); }
+html.dark .text-slate-900, html.dark .text-slate-800 { color: #f1f5f9; }
+html.dark .text-slate-700, html.dark .text-slate-600 { color: #cbd5e1; }
+html.dark .text-slate-500 { color: #94a3b8; }
+html.dark .text-slate-400 { color: #64748b; }
+html.dark .border-slate-100, html.dark .border-slate-200, html.dark .border-b, html.dark .border-t, html.dark .border-r, html.dark .border, html.dark .border-x { border-color: #27364d; }
+html.dark input, html.dark select, html.dark textarea { background-color: #0c1728; color: #e2e8f0; border-color: #334155; }
+html.dark input::placeholder, html.dark textarea::placeholder { color: #64748b; }
+html.dark table tbody tr:hover { background-color: rgba(30, 64, 175, .08); }
+html.dark .shadow-subtle, html.dark .shadow-xl, html.dark .shadow-2xl { box-shadow: 0 12px 32px rgba(0, 0, 0, .32); }
+html.dark .hover\:bg-slate-50:hover, html.dark .hover\:bg-slate-100:hover { background-color: #17243a; }
+html.dark .hover\:bg-blue-50:hover { background-color: rgba(30, 64, 175, .25); }
+html.dark .ring-white { --tw-ring-color: #101b2d; }
+
+/* The live activity center replaces the legacy decorative header bell. */
+header button:has(> span.h-1\.5) { display: none; }
+
+@media (min-width: 640px) {
+  .register-page form:has(#register-name) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1rem; row-gap: 1rem; }
+  .register-page form:has(#register-name) > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+  .register-page form:has(#register-name) > [role="alert"],
+  .register-page form:has(#register-name) > label:has(input[type="file"]),
+  .register-page form:has(#register-name) > div:has(#register-address),
+  .register-page form:has(#register-name) > div:has(#register-city),
+  .register-page form:has(#register-name) > button:not([type]) { grid-column: 1 / -1; }
+}
+
+/* Keep the service editor controls visible while its long form scrolls. */
+form[class*="max-h-[92vh]"] > div:first-child {
+  position: sticky;
+  top: -1.25rem;
+  z-index: 40;
+  margin: -1.25rem -1.25rem 0;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #dbe5f1;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .08);
+  backdrop-filter: blur(10px);
+}
+form[class*="max-h-[92vh]"] > div:first-child h2 {
+  font-size: 1.05rem;
+  color: #0f172a;
+}
+form[class*="max-h-[92vh]"] > div:first-child button {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: .6rem;
+  color: #475569;
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease;
+}
+form[class*="max-h-[92vh]"] > div:first-child button:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #0b6ff4;
+}
+html.dark form[class*="max-h-[92vh]"] > div:first-child {
+  border-color: #27364d;
+  background: rgba(16, 27, 45, .96);
+}
+html.dark form[class*="max-h-[92vh]"] > div:first-child h2 { color: #f1f5f9; }
+
+/* Legacy free-text feature field was replaced by structured comparison fields. */
+form[class*="max-h-[92vh]"] div:has(> label > textarea[maxlength="5000"]) { display: none; }
