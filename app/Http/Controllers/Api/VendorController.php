@@ -19,6 +19,8 @@ class VendorController extends Controller
 
         if ($request->user()->account_type === 'vendor') {
             $query->where('user_id', $request->user()->id);
+        } elseif (! $request->user()->isSuperAdmin()) {
+            $query->whereHas('assignedUsers', fn ($assigned) => $assigned->whereKey($request->user()->id));
         }
 
         return response()->json([
@@ -55,6 +57,7 @@ class VendorController extends Controller
 
     public function update(Request $request, Vendor $vendor)
     {
+        $this->authorizeAssignedVendor($request, $vendor);
         $data = $this->validatedData($request);
         $this->authorizeVendor($request, $vendor);
 
@@ -84,6 +87,7 @@ class VendorController extends Controller
     public function destroy(Request $request, Vendor $vendor)
     {
         abort_if($request->user()->account_type === 'vendor', 403, 'Vendor accounts cannot delete vendors.');
+        $this->authorizeAssignedVendor($request, $vendor);
 
         DB::transaction(function () use ($vendor) {
             $user = $vendor->user;
@@ -174,6 +178,14 @@ class VendorController extends Controller
     {
         if ($request->user()->account_type === 'vendor' && $vendor->user_id !== $request->user()->id) {
             abort(403, 'You can only access your own vendor account.');
+        }
+    }
+
+    private function authorizeAssignedVendor(Request $request, Vendor $vendor): void
+    {
+        $user = $request->user();
+        if ($user->account_type === 'staff' && ! $user->isSuperAdmin()) {
+            abort_unless($user->assignedVendors()->whereKey($vendor->id)->exists(), 403, 'This vendor is not assigned to you.');
         }
     }
 

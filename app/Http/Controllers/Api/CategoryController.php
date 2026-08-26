@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\SpecificationDefinition;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -15,19 +16,23 @@ class CategoryController extends Controller
     public function index(Request $request)
     {
         $query = Category::with('parent')->orderBy('name');
-        $request->query('type', 'category') === 'subcategory' ? $query->whereNotNull('parent_id') : $query->whereNull('parent_id');
+        $isSubcategory = $request->query('type', 'category') === 'subcategory';
+        $isSubcategory ? $query->whereNotNull('parent_id') : $query->whereNull('parent_id');
+        if ($isSubcategory && $request->user()->account_type === 'staff' && ! $request->user()->isSuperAdmin()) {
+            $query->whereHas('assignedUsers', fn ($assigned) => $assigned->whereKey($request->user()->id));
+        }
 
         return response()->json(['data' => $query->get()->map(fn ($item) => $this->resource($item))]);
     }
 
     public function marketplace()
     {
-        $categories = Category::with([
+        $categories = Cache::remember('marketplace:categories:v2', 600, fn () => Category::with([
             'services:id,category_id,service_type',
             'children' => fn ($query) => $query->orderBy('name'),
             'children.subcategoryServices:id,subcategory_id,service_type',
         ])
-            ->whereNull('parent_id')->orderBy('name')->get();
+            ->whereNull('parent_id')->orderBy('name')->get());
 
         return response()->json(['data' => $categories->map(fn ($category) => [
             'id' => $category->id,
@@ -41,13 +46,16 @@ class CategoryController extends Controller
                 'logo_url' => $child->logo_data ? url('/api/categories/'.$child->id.'/logo') : null,
                 'service_types' => $child->subcategoryServices->pluck('service_type')->unique()->values(),
             ]),
-        ])])->header('Cache-Control', 'private, max-age=300');
+        ])])->header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
     }
 
     public function store(Request $request)
     {
         $data = $this->validateRequest($request);
         $item = Category::create($this->attributes($data));
+        if ($item->parent_id && $request->user()->account_type === 'staff' && ! $request->user()->isSuperAdmin()) {
+            $request->user()->assignedSubcategories()->syncWithoutDetaching([$item->id]);
+        }
         $this->syncKeyPoints($item, $data);
 
         return response()->json(['message' => 'Saved successfully.', 'data' => $this->resource($item->load('parent'))], 201);
@@ -55,6 +63,7 @@ class CategoryController extends Controller
 
     public function update(Request $request, Category $category)
     {
+        $this->authorizeAssignedSubcategory($request, $category);
         $data = $this->validateRequest($request);
         $category->update($this->attributes($data, $category));
         $this->syncKeyPoints($category, $data);
@@ -62,8 +71,9 @@ class CategoryController extends Controller
         return response()->json(['message' => 'Saved successfully.', 'data' => $this->resource($category->load('parent'))]);
     }
 
-    public function destroy(Category $category)
+    public function destroy(Request $request, Category $category)
     {
+        $this->authorizeAssignedSubcategory($request, $category);
         SpecificationDefinition::where('source', 'subcategory_key_point')->where(fn ($query) => $query->where('subcategory_id', $category->id)->orWhere('category_id', $category->id))->delete();
         $category->delete();
 
@@ -106,5 +116,13 @@ return $data;
         if (($data['type'] ?? null) !== 'subcategory') return;
         SpecificationDefinition::where('subcategory_id', $category->id)->where('source', 'subcategory_key_point')->delete();
         foreach ($data['key_points'] ?? [] as $order => $name) SpecificationDefinition::create(['category_id' => $category->parent_id, 'subcategory_id' => $category->id, 'name' => $name, 'source' => 'subcategory_key_point', 'field_type' => 'boolean', 'is_required' => false, 'is_comparable' => true, 'sort_order' => 100 + $order]);
+    }
+
+    private function authorizeAssignedSubcategory(Request $request, Category $category): void
+    {
+        $user = $request->user();
+        if ($category->parent_id && $user->account_type === 'staff' && ! $user->isSuperAdmin()) {
+            abort_unless($user->assignedSubcategories()->whereKey($category->id)->exists(), 403, 'This subcategory is not assigned to you.');
+        }
     }
 }

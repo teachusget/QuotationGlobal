@@ -5,7 +5,7 @@ import { BrandedLoader } from '../components/ui'
 export default function ProtectedRoute() {
   const { isAuthenticated, loading } = useAuth()
   const location = useLocation()
-  if (loading) return <BrandedLoader/>
+  if (loading && !isAuthenticated) return <BrandedLoader/>
   if (isAuthenticated) return <Outlet />
   if (location.pathname === '/') return <Navigate to="/marketplace" replace />
   return <Navigate to="/login" replace state={{ from: location }} />

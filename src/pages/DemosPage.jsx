@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { getDemoMessages, getDemoRequests, moderateDemoChat, sendDemoMessage, updateDemoRequest } from '../api/demoRequests'
 import { useAuth } from '../auth/useAuth'
 import useDialogAccessibility from '../hooks/useDialogAccessibility'
+import { startVisiblePolling } from '../utils/visiblePolling'
 
 function ChatModal({ request, currentUser, onClose, onModerationChanged }) {
   const [messages, setMessages] = useState([])
@@ -39,9 +40,8 @@ function ChatModal({ request, currentUser, onClose, onModerationChanged }) {
     }).catch((err) => {
       if (active) setError(err.message)
     })
-    load()
-    const timer = setInterval(load, 5000)
-    return () => { active = false; clearInterval(timer) }
+    const stopPolling = startVisiblePolling(load, 10000)
+    return () => { active = false; stopPolling() }
   }, [request.id])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
@@ -268,9 +268,7 @@ export default function DemosPage() {
         navigate('/demos', { replace: true, state: null })
       }
     }).catch((err) => setError(err.message))
-    loadRequests()
-    const timer = setInterval(loadRequests, 15000)
-    return () => clearInterval(timer)
+    return startVisiblePolling(loadRequests, 30000)
   }, [location.state, navigate])
 
   const updateStatus = async (id, status, rejectionReason = '') => {

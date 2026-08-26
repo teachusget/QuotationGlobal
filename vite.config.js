@@ -23,6 +23,7 @@ function laravelHotFile() {
 }
 
 export default defineConfig({
+  base: '/build/',
   plugins: [react(), laravelHotFile()],
   publicDir: false,
   server: { host: '127.0.0.1', port: 5173, strictPort: true, cors: true },
@@ -30,6 +31,15 @@ export default defineConfig({
     outDir: 'public/build',
     emptyOutDir: true,
     manifest: 'manifest.json',
-    rollupOptions: { input: 'src/main.jsx' },
+    rollupOptions: {
+      input: 'src/main.jsx',
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          icons: ['lucide-react'],
+          alerts: ['sweetalert2'],
+        },
+      },
+    },
   },
 })

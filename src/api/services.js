@@ -7,9 +7,23 @@ async function request(url, options = {}) {
   return data
 }
 
-export const getServices = () => request('/api/services')
-export const createService = (payload) => request('/api/services', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-export const deleteService = (id) => request(`/api/services/${id}`, { method: 'DELETE' })
-export const updateService = (id, payload) => request(`/api/services/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-export const updateServiceProduct = (id, payload) => request(`/api/services/${id}/product`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-export const deleteServiceProduct = (id) => request(`/api/services/${id}/product`, { method: 'DELETE' })
+let servicesRequest
+let servicesResponse
+let servicesResponseAt = 0
+const invalidateServices = () => { servicesRequest = null; servicesResponse = null; servicesResponseAt = 0 }
+export const getServices = () => {
+  if (servicesResponse && Date.now() - servicesResponseAt < 5000) return Promise.resolve(servicesResponse)
+  if (servicesRequest) return servicesRequest
+  servicesRequest = request('/api/services').then((response) => {
+    servicesResponse = response
+    servicesResponseAt = Date.now()
+    return response
+  }).finally(() => { servicesRequest = null })
+  return servicesRequest
+}
+const mutateServices = async (...args) => { const response = await request(...args); invalidateServices(); return response }
+export const createService = (payload) => mutateServices('/api/services', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+export const deleteService = (id) => mutateServices(`/api/services/${id}`, { method: 'DELETE' })
+export const updateService = (id, payload) => mutateServices(`/api/services/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+export const updateServiceProduct = (id, payload) => mutateServices(`/api/services/${id}/product`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+export const deleteServiceProduct = (id) => mutateServices(`/api/services/${id}/product`, { method: 'DELETE' })

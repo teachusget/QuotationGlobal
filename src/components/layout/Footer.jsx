@@ -8,7 +8,7 @@ function FooterColumn({ title, links }) { const [open,setOpen] = useState(false)
 export default function Footer() {
   const [email,setEmail] = useState(''); const [error,setError] = useState(''); const [success,setSuccess] = useState(false)
   const submit = (event) => { event.preventDefault(); if (!/^\S+@\S+\.\S+$/.test(email)) { setError('Enter a valid email address.'); return } setError(''); setEmail(''); setSuccess(true); setTimeout(() => setSuccess(false), 2500) }
-  return <footer className="relative border-t bg-white px-5 py-6 lg:px-6">
+  return <footer className="marketplace-footer relative border-t bg-white px-5 py-6 lg:px-6">
     <div className="grid gap-7 xl:grid-cols-[1.5fr_3.6fr_1.35fr]">
       <div><BrandLogo/><p className="mt-3 max-w-[260px] text-[11px] leading-5 text-slate-500">Your trusted marketplace to discover, compare and connect with the best technology solutions and partners.</p><div className="mt-4 flex gap-2">{[Linkedin,Facebook,({className}) => <span className={className}>X</span>,Youtube].map((Icon,index) => <a href="#" aria-label={['LinkedIn','Facebook','X','YouTube'][index]} key={index} className="grid h-7 w-7 place-items-center rounded-full border text-slate-500 hover:border-primary hover:text-primary"><Icon className="h-3.5 w-3.5 text-[11px] font-bold"/></a>)}</div></div>
       <div className="grid gap-x-5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">{Object.entries(columns).map(([title,links]) => <FooterColumn key={title} title={title} links={links}/>)}</div>

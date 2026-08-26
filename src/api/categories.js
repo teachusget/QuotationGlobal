@@ -2,7 +2,7 @@ import { authHeaders } from '../auth/session'
 
 const API_URL = '/api/categories'
 let marketplaceCategoriesPromise
-const MARKETPLACE_CATEGORIES_CACHE = 'marketplace-categories-v2'
+const MARKETPLACE_CATEGORIES_CACHE = 'marketplace-categories-v5'
 const MARKETPLACE_CATEGORIES_TTL = 5 * 60 * 1000
 function clearMarketplaceCategoryCache() { marketplaceCategoriesPromise = undefined; sessionStorage.removeItem(MARKETPLACE_CATEGORIES_CACHE) }
 
@@ -30,13 +30,24 @@ export function getMarketplaceCategories() {
   if (marketplaceCategoriesPromise) return marketplaceCategoriesPromise
   try {
     const cached = JSON.parse(sessionStorage.getItem(MARKETPLACE_CATEGORIES_CACHE) || 'null')
-    if (cached?.savedAt > Date.now() - MARKETPLACE_CATEGORIES_TTL && Array.isArray(cached.data)) return Promise.resolve(cached.data)
+    if (cached?.savedAt > Date.now() - MARKETPLACE_CATEGORIES_TTL && Array.isArray(cached.data) && cached.data.length) return Promise.resolve(cached.data)
   } catch {
     sessionStorage.removeItem(MARKETPLACE_CATEGORIES_CACHE)
   }
-  marketplaceCategoriesPromise = request('/api/marketplace/categories')
+  marketplaceCategoriesPromise = fetch('/api/marketplace/categories?catalog_version=5', {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  }).then(async (response) => {
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.message || 'Unable to load marketplace categories.')
+      if (!Array.isArray(payload?.data)) throw new Error('The server returned an invalid marketplace category list.')
+      return payload
+    })
     .then((response) => {
-      if (!Array.isArray(response?.data)) throw new Error('The server returned an invalid marketplace category list.')
+      if (!response.data.length) {
+        sessionStorage.removeItem(MARKETPLACE_CATEGORIES_CACHE)
+        return []
+      }
       sessionStorage.setItem(MARKETPLACE_CATEGORIES_CACHE, JSON.stringify({ savedAt: Date.now(), data: response.data }))
       return response.data
     })
@@ -44,6 +55,7 @@ export function getMarketplaceCategories() {
       marketplaceCategoriesPromise = undefined
       throw error
     })
+    .finally(() => { marketplaceCategoriesPromise = undefined })
   return marketplaceCategoriesPromise
 }
 async function serialize(formData) {

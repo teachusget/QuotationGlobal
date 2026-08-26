@@ -1,4 +1,4 @@
-import { ChevronDown, Plus, X } from 'lucide-react'
+import { ChevronDown, FileCheck2, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import Swal from 'sweetalert2'
 import { getBrands } from '../api/brands'
@@ -7,59 +7,91 @@ import { getIndustries } from '../api/industries'
 import { createService, deleteService, deleteServiceProduct, getServices, updateServiceProduct } from '../api/services'
 import { getVendors } from '../api/vendors'
 import { getSpecifications } from '../api/specifications'
+import { getSellingCountries } from '../api/sellingCountries'
 import { useAuth } from '../auth/useAuth'
+import CountryMultiSelect from '../components/common/CountryMultiSelect'
 import useDialogAccessibility from '../hooks/useDialogAccessibility'
 
 const subscriptionPlans = [{ value: 'monthly', label: 'Monthly', months: 1 }, { value: 'quarterly', label: 'Quarterly', months: 3 }, { value: 'semi_annual', label: 'Semi-Annual', months: 6 }, { value: 'annual', label: 'Annual / Yearly', months: 12 }]
 const servicePlans = [{ value: 'hourly', label: 'Hourly', months: 1 / 720 }, { value: 'daily', label: 'Daily', months: 1 / 30 }, { value: 'monthly', label: 'Monthly', months: 1 }, { value: 'annual', label: 'Yearly', months: 12 }]
 let pricingServiceType = ''
 const plans = { map: (callback) => (pricingServiceType === 'services' ? servicePlans : subscriptionPlans).map(callback) }
-const blank = { vendor_id: '', name: '', features: '', specifications: {}, service_type: '', ai_enabled: '', pricing_mode: 'starting_price', category_id: '', subcategory_id: '', industry_ids: [], brand_id: '', monthly_price: '', billing_cycles: [], discounts: {} }
+const blank = { vendor_id: '', name: '', sku: '', inventory_quantity: '', low_stock_threshold: 5, track_inventory: true, features: '', certificates: [], specifications: {}, service_type: '', deployment: '', ai_enabled: '', sell_globally: '', selling_countries: [], pricing_mode: 'starting_price', category_id: '', subcategory_id: '', industry_ids: [], brand_id: '', monthly_price: '', billing_cycles: [], discounts: {} }
 
 export default function ServicesPage() {
   const { user } = useAuth()
   const isVendor = user?.account_type === 'vendor'
   const [services, setServices] = useState([]); const [categories, setCategories] = useState([]); const [subs, setSubs] = useState([]); const [industries, setIndustries] = useState([]); const [brands, setBrands] = useState([]); const [vendors, setVendors] = useState([]); const [form, setForm] = useState(blank); const [open, setOpen] = useState(false); const [editingId, setEditingId] = useState(null); const [error, setError] = useState(''); const [saving, setSaving] = useState(false); const [imageFiles, setImageFiles] = useState([]); const [editorTouched, setEditorTouched] = useState(false)
-  const closeEditor = () => { if (editorTouched && !window.confirm('Discard your unsaved service changes?')) return; setOpen(false) }
+  const [servicesLoading, setServicesLoading] = useState(true)
+  const closeEditor = () => { if (editorTouched && !window.confirm('Discard your unsaved service changes?')) return; setEditorTouched(false); setOpen(false) }
   const dialogRef = useDialogAccessibility(open, closeEditor, saving)
+  useEffect(() => {
+    const serviceForm = dialogRef.current
+    if (!open || !serviceForm) return undefined
+    const showRequiredFields = () => serviceForm.classList.add('service-form', 'was-validated')
+    serviceForm.addEventListener('invalid', showRequiredFields, true)
+    return () => serviceForm.removeEventListener('invalid', showRequiredFields, true)
+  }, [open, dialogRef])
+  useEffect(() => {
+    const serviceForm = dialogRef.current
+    if (!serviceForm) return
+    serviceForm.querySelectorAll('.required-field-error').forEach((field) => field.classList.remove('required-field-error'))
+    if (error === 'Select at least one industry.') {
+      const label = [...serviceForm.querySelectorAll('label')].find((item) => item.textContent.trim() === 'Industry *')
+      label?.parentElement?.querySelector('button')?.classList.add('required-field-error')
+    }
+    if (error === 'Select at least one billing plan.') {
+      const heading = [...serviceForm.querySelectorAll('h3')].find((item) => item.textContent.trim() === 'Billing Plans & Discounts')
+      heading?.parentElement?.classList.add('required-field-error')
+    }
+  }, [error, form.industry_ids.length, form.billing_cycles.length, dialogRef])
   useEffect(() => { if (!editorTouched) return undefined; const warn = (event) => { event.preventDefault(); event.returnValue = '' }; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn) }, [editorTouched])
   useEffect(() => {
-    const load = async () => {
-      const results = await Promise.allSettled([getServices(), getCategories(), getCategories('subcategory'), getIndustries(), getBrands()])
-      const [serviceResult, categoryResult, subcategoryResult, industryResult, brandResult] = results
-      if (serviceResult.status === 'fulfilled') setServices(serviceResult.value.data || [])
-      if (categoryResult.status === 'fulfilled') setCategories(categoryResult.value.data || [])
-      if (subcategoryResult.status === 'fulfilled') setSubs(subcategoryResult.value.data || [])
-      if (industryResult.status === 'fulfilled') setIndustries(industryResult.value || [])
-      if (brandResult.status === 'fulfilled') setBrands((brandResult.value.data || []).filter((item) => item.status === 'approved'))
-      if (!isVendor) {
-        try { setVendors((await getVendors()).map((vendor) => ({ id: vendor.id, name: vendor.company_name || vendor.name }))) } catch (err) { setError(err.message) }
-      }
-      const failure = results.find((result) => result.status === 'rejected')
-      if (failure) setError(failure.reason.message)
-    }
-    load()
+    let active = true
+    getServices().then((result) => { if (active) setServices(result.data || []) }).catch((err) => { if (active) setError(err.message) }).finally(() => { if (active) setServicesLoading(false) })
+    getCategories().then((result) => { if (active) setCategories(result.data || []) }).catch((err) => { if (active) setError(err.message) })
+    getCategories('subcategory').then((result) => { if (active) setSubs(result.data || []) }).catch((err) => { if (active) setError(err.message) })
+    getIndustries().then((result) => { if (active) setIndustries(result || []) }).catch((err) => { if (active) setError(err.message) })
+    getBrands().then((result) => { if (active) setBrands((result.data || []).filter((item) => item.status === 'approved')) }).catch((err) => { if (active) setError(err.message) })
+    if (!isVendor) getVendors().then((result) => { if (active) setVendors(result.map((vendor) => ({ id: vendor.id, name: vendor.company_name || vendor.name }))) }).catch((err) => { if (active) setError(err.message) })
+    return () => { active = false }
   }, [isVendor])
   useEffect(() => {
     const addImages = (event) => { setEditorTouched(true); setImageFiles((current) => [...current, ...event.detail].slice(0, 8)) }
     const setAiEnabled = (event) => set('ai_enabled', event.detail)
+    const setDeployment = (event) => set('deployment', event.detail)
+    const setCertificates = (event) => { setEditorTouched(true); setForm((current) => ({ ...current, certificates: event.detail })) }
+    const removeDeletedProduct = (event) => {
+      const deleted = event.detail
+      setServices((current) => current.filter((item) => !(item.vendor_id === deleted.vendor_id && item.name === deleted.name && item.service_type === deleted.service_type)))
+      setEditorTouched(false)
+    }
+    const setSellingCountries = (event) => { set('sell_globally', event.detail.sell_globally); set('selling_countries', event.detail.selling_countries) }
     const editProduct = (event) => {
       const service = event.detail
       pricingServiceType = service.service_type
       const discounts = Object.fromEntries(service.plans.map((plan) => [plan.billing_cycle, Number(plan.discount_percent || 0)]))
       const specifications = Object.fromEntries((service.specification_values || []).map((item) => [item.specification_definition_id, item.value]))
-      setForm({ vendor_id: String(service.vendor_id), name: service.name, features: service.features || '', specifications, service_type: service.service_type, ai_enabled: Boolean(service.ai_enabled), pricing_mode: service.pricing_mode, category_id: String(service.category_id), subcategory_id: String(service.subcategory_id), industry_ids: (service.industries || []).map((item) => String(item.id)), brand_id: (service.brands || []).map((item) => String(item.id)), monthly_price: String(service.monthly_price || 0), billing_cycles: service.plans.map((plan) => plan.billing_cycle), discounts })
+      setForm({ vendor_id: String(service.vendor_id), name: service.name, sku: service.sku || '', inventory_quantity: service.inventory_quantity ?? '', low_stock_threshold: service.low_stock_threshold ?? 5, track_inventory: service.track_inventory ?? true, features: service.features || '', certificates: service.certificates || [], specifications, service_type: service.service_type, deployment: service.deployment || '', ai_enabled: Boolean(service.ai_enabled), sell_globally: Boolean(service.sell_globally), selling_countries: service.selling_countries || [], pricing_mode: service.pricing_mode, category_id: String(service.category_id), subcategory_id: String(service.subcategory_id), industry_ids: (service.industries || []).map((item) => String(item.id)), brand_id: (service.brands || []).map((item) => String(item.id)), monthly_price: String(service.monthly_price || 0), billing_cycles: service.plans.map((plan) => plan.billing_cycle), discounts })
       setEditingId(service.id); setError(''); setEditorTouched(false); setOpen(true)
-      setTimeout(() => { window.dispatchEvent(new CustomEvent('service-ai-editor-value', { detail: Boolean(service.ai_enabled) })); window.dispatchEvent(new CustomEvent('service-specification-editor-value', { detail: { context: service, values: specifications } })) }, 0)
+      setTimeout(() => { window.dispatchEvent(new CustomEvent('service-ai-editor-value', { detail: Boolean(service.ai_enabled) })); window.dispatchEvent(new CustomEvent('service-certificates-editor-value', { detail: service.certificates || [] })); window.dispatchEvent(new CustomEvent('service-deployment-editor-value', { detail: service.deployment || '' })); window.dispatchEvent(new CustomEvent('service-selling-editor-value', { detail: { sell_globally: Boolean(service.sell_globally), selling_countries: service.selling_countries || [] } })); window.dispatchEvent(new CustomEvent('service-specification-editor-value', { detail: { context: service, values: specifications } })) }, 0)
     }
     window.addEventListener('service-images-selected', addImages)
     window.addEventListener('service-ai-selected', setAiEnabled)
+    window.addEventListener('service-deployment-selected', setDeployment)
+    window.addEventListener('service-certificates-selected', setCertificates)
+    window.addEventListener('service-product-deleted', removeDeletedProduct)
+    window.addEventListener('service-selling-changed', setSellingCountries)
     window.addEventListener('service-edit-requested', editProduct)
     const setSpecifications = (event) => set('specifications', event.detail)
     window.addEventListener('service-specifications-changed', setSpecifications)
     return () => {
       window.removeEventListener('service-images-selected', addImages)
       window.removeEventListener('service-ai-selected', setAiEnabled)
+      window.removeEventListener('service-deployment-selected', setDeployment)
+      window.removeEventListener('service-certificates-selected', setCertificates)
+      window.removeEventListener('service-product-deleted', removeDeletedProduct)
+      window.removeEventListener('service-selling-changed', setSellingCountries)
       window.removeEventListener('service-edit-requested', editProduct)
       window.removeEventListener('service-specifications-changed', setSpecifications)
     }
@@ -68,16 +100,16 @@ export default function ServicesPage() {
   }, [])
   const set = (key, value) => { setEditorTouched(true); if (key === 'service_type') pricingServiceType = value; const context = { ...form, [key]: value, ...(key === 'category_id' ? { subcategory_id: '' } : {}) }; setForm((old) => ({ ...old, [key]: value, ...(key === 'service_type' ? { specifications: {}, billing_cycles: value === 'services' ? servicePlans.map((plan) => plan.value) : [], discounts: {} } : {}), ...(key === 'category_id' ? { subcategory_id: '', specifications: {} } : {}), ...(key === 'subcategory_id' ? { specifications: {} } : {}) })); if (['service_type', 'category_id', 'subcategory_id'].includes(key)) setTimeout(() => { window.dispatchEvent(new CustomEvent('service-specification-context', { detail: context })); if (key === 'service_type') window.dispatchEvent(new CustomEvent('service-type-changed', { detail: value })) }, 0) }
   const remove = async (id) => { if (!window.confirm('Delete this billing plan?')) return; try { await deleteService(id); setServices((current) => current.filter((item) => item.id !== id)) } catch (err) { setError(err.message) } }
-  const save = async (event) => { event.preventDefault(); if (form.ai_enabled === '') return setError('Please select whether this service is AI enabled.'); if (!form.industry_ids.length) return setError('Select at least one industry.'); if (!form.billing_cycles.length) return setError('Select at least one billing plan.'); setSaving(true); setError(''); try { const image_datas = await Promise.all(imageFiles.map((file) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file) }))); const payload = { ...form, features: form.features.trim(), image_datas, brand_ids: Array.isArray(form.brand_id) ? form.brand_id : form.brand_id ? [form.brand_id] : [] }; const result = editingId ? await updateServiceProduct(editingId, payload) : await createService(payload); if (editingId) return window.location.reload(); setServices((old) => [...result.data, ...old]); setOpen(false); setEditingId(null); setForm(blank); setImageFiles([]) } catch (err) { setError(err.message) } finally { setSaving(false) } }
+  const save = async (event) => { event.preventDefault(); if (form.ai_enabled === '') return setError('Please select whether this service is AI enabled.'); if (!form.industry_ids.length) return setError('Select at least one industry.'); if (!form.billing_cycles.length) return setError('Select at least one billing plan.'); setSaving(true); setError(''); try { const image_datas = await Promise.all(imageFiles.map((file) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file) }))); const payload = { ...form, features: form.features.trim(), image_datas, brand_ids: Array.isArray(form.brand_id) ? form.brand_id : form.brand_id ? [form.brand_id] : [] }; const original = editingId ? services.find((service) => service.id === editingId) : null; const result = editingId ? await updateServiceProduct(editingId, payload) : await createService(payload); setServices((old) => editingId && original ? [...result.data, ...old.filter((service) => !(service.vendor_id === original.vendor_id && service.name === original.name && service.service_type === original.service_type))] : [...result.data, ...old]); setOpen(false); setEditingId(null); setForm(blank); setImageFiles([]); setEditorTouched(false) } catch (err) { setError(err.message) } finally { setSaving(false) } }
   const flexible = form.pricing_mode === 'flexible_price'; const price = Number(form.monthly_price || 0); const filteredSubs = subs.filter((item) => String(item.parent_id) === String(form.category_id))
-  return <section><div className="flex items-end justify-between"><div><h1 className="text-xl font-bold">{isVendor ? 'My Services' : 'Solutions / Services'}</h1><p className="mt-1 text-sm text-slate-500">{isVendor ? 'Manage your services and pricing.' : 'Review and manage all vendor services.'}</p></div><button onClick={() => { setError(''); setEditorTouched(false); setOpen(true) }} className="flex h-9 items-center gap-2 rounded-md bg-primary px-3.5 text-xs font-semibold text-white"><Plus className="h-4 w-4"/>Add Service</button></div><ServiceTable services={services} onDelete={remove} showVendor={!isVendor}/>{open && <div className="fixed inset-0 z-[70] grid place-items-center p-4"><button onClick={closeEditor} className="absolute inset-0 bg-slate-950/45"/><form ref={dialogRef} role="dialog" aria-modal="true" aria-label="Service editor" onSubmit={save} className="relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-5"><div className="flex items-center justify-between border-b pb-3"><h2 className="font-bold">Add Service</h2><button type="button" onClick={closeEditor}><X className="h-5 w-5"/></button></div><div className="mt-4 grid gap-4 sm:grid-cols-2">{!isVendor && <Drop label="Vendor" value={form.vendor_id} onChange={(v) => set('vendor_id', v)} options={vendors} required wide/>}<Text label="Service Name" value={form.name} onChange={(v) => set('name', v)} required wide/><div className="sm:col-span-2"><label className="text-xs font-semibold">Features & Details <span className="font-normal text-slate-400">(one point per line)</span><textarea value={form.features} onChange={(event) => set('features', event.target.value)} maxLength={5000} rows="5" placeholder={'Cloud-based access\nAutomated reports and dashboards\nMobile app support\nImplementation and training included'} className="mt-1.5 w-full resize-y rounded-md border p-3 text-sm font-normal leading-5 outline-none focus:border-primary"/></label><p className="mt-1 text-right text-[11px] text-slate-400">{form.features.length}/5000</p></div><Drop label="Category" value={form.category_id} onChange={(v) => set('category_id', v)} options={categories} required/><Drop label="Subcategory" value={form.subcategory_id} onChange={(v) => set('subcategory_id', v)} options={filteredSubs} required/><MultiIndustries options={industries} value={form.industry_ids} onChange={(v) => set('industry_ids', v)}/><Drop label="Service Type" value={form.service_type} onChange={(v) => set('service_type', v)} options={['software', 'hardware', 'services'].map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }))} required/><Drop label="Brand" value={form.brand_id} onChange={(v) => set('brand_id', v)} options={brands}/><div className="sm:col-span-2"><label className="text-xs font-semibold">Price Display *</label><div className="mt-1.5 inline-flex rounded-md border p-1"><button type="button" onClick={() => set('pricing_mode', 'starting_price')} className={`rounded px-4 py-2 text-xs font-semibold ${!flexible ? 'bg-primary text-white' : ''}`}>Fixed Price</button><button type="button" onClick={() => set('pricing_mode', 'flexible_price')} className={`rounded px-4 py-2 text-xs font-semibold ${flexible ? 'bg-primary text-white' : ''}`}>Flexible Price</button></div></div><Text label={flexible ? 'Flexible Starting Price (USD)' : 'Fixed Monthly Price (USD)'} value={form.monthly_price} onChange={(v) => set('monthly_price', v)} type="number" required/></div><div className="mt-5 rounded-md border p-3"><h3 className="text-xs font-bold">Billing Plans & Discounts</h3>{plans.map((plan) => { const checked = form.billing_cycles.includes(plan.value); const discount = Number(form.discounts[plan.value] || 0); const total = price * plan.months * (1 - discount / 100); return <div key={plan.value} className="mt-2 grid grid-cols-[auto_1fr_90px] gap-3 rounded border p-2"><input type="checkbox" checked={checked} onChange={() => set('billing_cycles', checked ? form.billing_cycles.filter((item) => item !== plan.value) : [...form.billing_cycles, plan.value])}/><span className="text-xs"><b>{plan.label}</b><br/>{flexible ? `Flexible from $${total.toFixed(2)}` : `$${total.toFixed(2)}`}</span><label className="text-[11px]">Discount %<input type="number" min="0" max="100" disabled={!checked} value={form.discounts[plan.value] || ''} onChange={(e) => set('discounts', { ...form.discounts, [plan.value]: e.target.value })} className="mt-1 h-8 w-full border px-2"/></label></div> })}</div>{error && <p className="mt-4 text-xs text-red-600">{error}</p>}<div className="mt-5 text-right"><button disabled={saving} className="h-9 rounded-md bg-primary px-4 text-xs font-semibold text-white">Save Service</button></div></form></div>}</section>
+  return <section><div className="flex items-end justify-between"><div><h1 className="text-xl font-bold">{isVendor ? 'My Services' : 'Solutions / Services'}</h1><p className="mt-1 text-sm text-slate-500">{isVendor ? 'Manage your services and pricing.' : 'Review and manage all vendor services.'}</p></div><button onClick={() => { setError(''); setEditorTouched(false); setOpen(true) }} className="flex h-9 items-center gap-2 rounded-md bg-primary px-3.5 text-xs font-semibold text-white"><Plus className="h-4 w-4"/>Add Service</button></div><ServiceTable services={services} onDelete={remove} showVendor={!isVendor}/>{open && <div className="fixed inset-0 z-[70] grid place-items-center p-4"><button onClick={closeEditor} className="absolute inset-0 bg-slate-950/45"/><form ref={dialogRef} role="dialog" aria-modal="true" aria-label="Service editor" onSubmit={save} className="relative max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-5"><div className="flex items-center justify-between border-b pb-3"><h2 className="font-bold">Add Service</h2><button type="button" onClick={closeEditor}><X className="h-5 w-5"/></button></div><div className="mt-4 grid gap-4 sm:grid-cols-2">{!isVendor && <Drop label="Vendor" value={form.vendor_id} onChange={(v) => set('vendor_id', v)} options={vendors} required wide/>}<Text label="Service Name" value={form.name} onChange={(v) => set('name', v)} required wide/><div className="sm:col-span-2"><label className="text-xs font-semibold">Features & Details <span className="font-normal text-slate-400">(one point per line)</span><textarea value={form.features} onChange={(event) => set('features', event.target.value)} maxLength={5000} rows="5" placeholder={'Cloud-based access\nAutomated reports and dashboards\nMobile app support\nImplementation and training included'} className="mt-1.5 w-full resize-y rounded-md border p-3 text-sm font-normal leading-5 outline-none focus:border-primary"/></label><p className="mt-1 text-right text-[11px] text-slate-400">{form.features.length}/5000</p></div><Drop label="Category" value={form.category_id} onChange={(v) => set('category_id', v)} options={categories} required/><Drop label="Subcategory" value={form.subcategory_id} onChange={(v) => set('subcategory_id', v)} options={filteredSubs} required/><MultiIndustries options={industries} value={form.industry_ids} onChange={(v) => set('industry_ids', v)}/><Drop label="Service Type" value={form.service_type} onChange={(v) => set('service_type', v)} options={['software', 'hardware', 'services'].map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }))} required/>{form.service_type === 'hardware' && <><div className="sm:col-span-2 rounded-lg border border-blue-100 bg-blue-50 p-3"><p className="text-xs font-bold text-blue-800">Hardware inventory</p><p className="mt-1 text-[11px] text-blue-700">SKU identifies the exact product. Stock is reduced automatically when a buyer places an order.</p></div><Text label="SKU" value={form.sku} onChange={(v) => set('sku', v.toUpperCase())} required/><Text label="Available stock" value={form.inventory_quantity} onChange={(v) => set('inventory_quantity', v)} type="number" required/><Text label="Low-stock alert at" value={form.low_stock_threshold} onChange={(v) => set('low_stock_threshold', v)} type="number" required/><label className="flex items-center gap-2 self-end pb-3 text-xs font-semibold"><input type="checkbox" checked={Boolean(form.track_inventory)} onChange={(event) => set('track_inventory', event.target.checked)} className="h-4 w-4 accent-primary"/>Track inventory</label></>}<Drop label="Brand" value={form.brand_id} onChange={(v) => set('brand_id', v)} options={brands}/><div className="sm:col-span-2"><label className="text-xs font-semibold">Price Display *</label><div className="mt-1.5 inline-flex rounded-md border p-1"><button type="button" onClick={() => set('pricing_mode', 'starting_price')} className={`rounded px-4 py-2 text-xs font-semibold ${!flexible ? 'bg-primary text-white' : ''}`}>Fixed Price</button><button type="button" onClick={() => set('pricing_mode', 'flexible_price')} className={`rounded px-4 py-2 text-xs font-semibold ${flexible ? 'bg-primary text-white' : ''}`}>Flexible Price</button></div></div><Text label={flexible ? 'Flexible Starting Price (USD)' : 'Fixed Monthly Price (USD)'} value={form.monthly_price} onChange={(v) => set('monthly_price', v)} type="number" required/></div><div className="mt-5 rounded-md border p-3"><h3 className="text-xs font-bold">Billing Plans & Discounts</h3>{plans.map((plan) => { const checked = form.billing_cycles.includes(plan.value); const discount = Number(form.discounts[plan.value] || 0); const total = price * plan.months * (1 - discount / 100); return <div key={plan.value} className="mt-2 grid grid-cols-[auto_1fr_90px] gap-3 rounded border p-2"><input type="checkbox" checked={checked} onChange={() => set('billing_cycles', checked ? form.billing_cycles.filter((item) => item !== plan.value) : [...form.billing_cycles, plan.value])}/><span className="text-xs"><b>{plan.label}</b><br/>{flexible ? `Flexible from $${total.toFixed(2)}` : `$${total.toFixed(2)}`}</span><label className="text-[11px]">Discount %<input type="number" min="0" max="100" disabled={!checked} value={form.discounts[plan.value] || ''} onChange={(e) => set('discounts', { ...form.discounts, [plan.value]: e.target.value })} className="mt-1 h-8 w-full border px-2"/></label></div> })}</div>{error && <p className="mt-4 text-xs text-red-600">{error}</p>}<div className="mt-5 text-right"><button disabled={saving} className="h-9 rounded-md bg-primary px-4 text-xs font-semibold text-white">Save Service</button></div></form></div>}</section>
 }
 const editProduct = (service) => window.dispatchEvent(new CustomEvent('service-edit-requested', { detail: service }))
 
 async function deleteProduct(service) {
   const result = await Swal.fire({ icon: 'warning', title: 'Delete complete service?', text: `${service.name} and all of its pricing plans will be permanently deleted.`, showCancelButton: true, confirmButtonText: 'Delete service', confirmButtonColor: '#dc2626' })
   if (!result.isConfirmed) return
-  try { await deleteServiceProduct(service.id); window.location.reload() } catch (error) { Swal.fire({ icon: 'error', title: 'Delete failed', text: error.message }) }
+  try { await deleteServiceProduct(service.id); window.dispatchEvent(new CustomEvent('service-product-deleted', { detail: service })); Swal.fire({ icon: 'success', title: 'Service deleted', timer: 1200, showConfirmButton: false }) } catch (error) { Swal.fire({ icon: 'error', title: 'Delete failed', text: error.message }) }
 }
 
 function ServiceTable({ services, showVendor = false }) {
@@ -98,7 +130,7 @@ function ServiceTable({ services, showVendor = false }) {
         <td className="max-w-44 p-3 leading-5">{service.industries?.map((industry) => industry.name).join(', ') || '-'}</td>
         <td className="p-3">{service.brands?.map((brand) => brand.name).join(', ') || '-'}</td>
         <td className="p-3"><div className="flex max-w-sm flex-wrap gap-1.5">{service.plans.map((plan) => <span key={plan.id} className="rounded bg-slate-100 px-2 py-1 leading-5"><b>{planLabels[plan.billing_cycle]}</b> <strong className="ml-1 text-primary">{plan.pricing_mode === 'flexible_price' ? `Flexible $${Number(plan.price_from).toLocaleString()}` : `$${Number(plan.price_from).toLocaleString()}`}</strong>{Number(plan.discount_percent || 0) > 0 && <em className="ml-1 not-italic text-emerald-700">{plan.discount_percent}% OFF</em>}</span>)}</div></td>
-        <td className="p-3"><div className="flex gap-3"><button type="button" onClick={() => editProduct(service)} className="font-semibold text-primary hover:underline">Edit Service</button><button type="button" onClick={() => deleteProduct(service)} className="font-semibold text-red-600 hover:underline">Delete Service</button></div></td>
+        <td className="p-3"><div className="flex flex-wrap gap-2"><button type="button" onClick={() => editProduct(service)} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-blue-200 bg-white px-2.5 text-[11px] font-semibold text-primary transition hover:bg-blue-50"><Pencil className="h-3.5 w-3.5"/>Edit</button><button type="button" onClick={() => deleteProduct(service)} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 text-[11px] font-semibold text-red-600 transition hover:bg-red-50"><Trash2 className="h-3.5 w-3.5"/>Delete</button></div></td>
       </tr>)}{!grouped.length && <tr><td colSpan={showVendor ? 7 : 6} className="p-10 text-center text-sm text-slate-500">No services added yet.</td></tr>}</tbody>
     </table>
   </div>
@@ -130,6 +162,7 @@ function Text({ label, value, onChange, required, type = 'text', wide }) {
   useEffect(() => { const changed = (event) => setServiceType(event.detail); window.addEventListener('service-type-changed', changed); return () => window.removeEventListener('service-type-changed', changed) }, [])
   const selectImages = (event) => {
     const added = [...event.target.files]
+    if (added.some((file) => file.size >= 1024 * 1024)) { window.alert('Each service image must be smaller than 1 MB.'); event.target.value = ''; return }
     const files = [...previews.map((image) => image.file), ...added].slice(0, 8)
     setPreviews(files.map((file) => ({ file, name: file.name, url: URL.createObjectURL(file) })))
     window.dispatchEvent(new CustomEvent('service-images-selected', { detail: added }))
@@ -138,7 +171,7 @@ function Text({ label, value, onChange, required, type = 'text', wide }) {
   const shownLabel = serviceType === 'services' && type === 'number' ? (label.startsWith('Flexible') ? 'Flexible Monthly Base Rate (USD)' : 'Fixed Monthly Base Rate (USD)') : label
   return <div className={`text-xs font-semibold ${wide ? 'sm:col-span-2' : ''}`}>
     <label>{shownLabel}{required && ' *'}<input type={type} value={value} required={required} min={type === 'number' ? '0' : undefined} step={type === 'number' ? '0.01' : undefined} onChange={(e) => onChange(e.target.value)} className="mt-1.5 h-10 w-full rounded-md border px-3 text-sm font-normal"/></label>
-    {label === 'Service Name' && <label className="mt-3 block">Service Images <span className="font-normal text-slate-500">(up to 8 PNG, JPG or WebP files)</span><input id="service-image" type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={selectImages} className="mt-1.5 block w-full text-xs font-normal"/>{previews.length > 0 && <span className="mt-3 grid grid-cols-4 gap-2">{previews.map((image) => <img key={image.url} src={image.url} alt={image.name} className="h-16 w-full rounded border object-cover"/>)}</span>}</label>}
+    {label === 'Service Name' && <label className="mt-3 block">Service Images <span className="font-normal text-slate-500">(up to 8 PNG, JPG or WebP files · each smaller than 1 MB)</span><input id="service-image" type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={selectImages} className="mt-1.5 block w-full text-xs font-normal"/>{previews.length > 0 && <span className="mt-3 grid grid-cols-4 gap-2">{previews.map((image) => <img key={image.url} src={image.url} alt={image.name} className="h-16 w-full rounded border object-cover"/>)}</span>}</label>}
   </div>
 }
 
@@ -146,7 +179,50 @@ function AiAndSpecifications() {
   const [aiEnabled, setAiEnabled] = useState('')
   useEffect(() => { const load = (event) => setAiEnabled(event.detail ? 'yes' : 'no'); window.addEventListener('service-ai-editor-value', load); return () => window.removeEventListener('service-ai-editor-value', load) }, [])
   const selectAi = (selected) => { setAiEnabled(selected); window.dispatchEvent(new CustomEvent('service-ai-selected', { detail: selected === 'yes' })) }
-  return <><fieldset className="rounded-md border border-blue-100 bg-blue-50/60 p-3"><legend className="px-1 text-xs font-semibold">Is this service AI enabled? *</legend><div className="mt-1 flex gap-5">{['yes', 'no'].map((option) => <label key={option} className="flex cursor-pointer items-center gap-2 text-sm font-medium capitalize"><input required type="radio" name="ai_enabled" value={option} checked={aiEnabled === option} onChange={() => selectAi(option)} className="h-4 w-4"/>{option}</label>)}</div></fieldset><StructuredSpecifications/></>
+  return <><CertificateUpload/><DeploymentEditor/><fieldset className="mt-4 rounded-md border border-blue-100 bg-blue-50/60 p-3"><legend className="px-1 text-xs font-semibold">Is this service AI enabled? *</legend><div className="mt-1 flex gap-5">{['yes', 'no'].map((option) => <label key={option} className="flex cursor-pointer items-center gap-2 text-sm font-medium capitalize"><input required type="radio" name="ai_enabled" value={option} checked={aiEnabled === option} onChange={() => selectAi(option)} className="h-4 w-4"/>{option}</label>)}</div></fieldset><GlobalSellingEditor/><StructuredSpecifications/></>
+}
+
+function CertificateUpload() {
+  const [certificates, setCertificates] = useState([])
+  const [uploadError, setUploadError] = useState('')
+  useEffect(() => { const load = (event) => setCertificates(event.detail || []); window.addEventListener('service-certificates-editor-value', load); return () => window.removeEventListener('service-certificates-editor-value', load) }, [])
+  const publish = (next) => { setCertificates(next); window.dispatchEvent(new CustomEvent('service-certificates-selected', { detail: next })) }
+  const choose = (event) => {
+    const files = [...(event.target.files || [])]
+    event.target.value = ''
+    if (!files.length) return
+    if (files.some((file) => !['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(file.type))) return setUploadError('Use PDF, JPG, PNG or WebP certificates only.')
+    if (files.some((file) => file.size >= 1024 * 1024)) return setUploadError('Each certificate must be smaller than 1 MB.')
+    Promise.all(files.map((file) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve({ name: file.name, data: reader.result }); reader.onerror = reject; reader.readAsDataURL(file) }))).then((added) => { publish([...certificates, ...added]); setUploadError('') }).catch(() => setUploadError('Unable to read the selected certificate.'))
+  }
+  const remove = (index) => { publish(certificates.filter((_, itemIndex) => itemIndex !== index)); setUploadError('') }
+  if (true) return <div className="mb-4"><p className="text-xs font-semibold">Service Certificates <span className="font-normal text-slate-400">(optional)</span></p>{certificates.map((certificate, index) => <div key={`${certificate.name}-${index}`} className="mt-1.5 flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-2.5"><FileCheck2 className="h-4 w-4 shrink-0 text-emerald-600"/><span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{certificate.name}</span><button type="button" onClick={() => remove(index)} className="rounded p-1.5 text-red-500 hover:bg-red-100" aria-label={`Remove ${certificate.name}`}><Trash2 className="h-4 w-4"/></button></div>)}<label className="mt-1.5 flex h-11 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed bg-slate-50 text-xs font-semibold text-primary hover:border-primary hover:bg-blue-50"><Upload className="h-4 w-4"/>{certificates.length ? 'Add more certificates' : 'Upload certificates'}<input multiple type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={choose} className="sr-only"/></label>{uploadError && <p className="mt-1 text-[11px] text-red-600">{uploadError}</p>}<p className="mt-1 text-[10px] text-slate-400">PDF, JPG, PNG or WebP · Each file must be smaller than 1 MB</p></div>
+  return <div className="mb-4"><p className="text-xs font-semibold">Service Certificate <span className="font-normal text-slate-400">(optional)</span></p>{name ? <div className="mt-1.5 flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-2.5"><FileCheck2 className="h-4 w-4 shrink-0 text-emerald-600"/><span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{name}</span><button type="button" onClick={remove} className="rounded p-1.5 text-red-500 hover:bg-red-100" aria-label="Remove certificate"><Trash2 className="h-4 w-4"/></button></div> : <label className="mt-1.5 flex h-11 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed bg-slate-50 text-xs font-semibold text-primary hover:border-primary hover:bg-blue-50"><Upload className="h-4 w-4"/>Upload certificate<input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={choose} className="sr-only"/></label>}{uploadError && <p className="mt-1 text-[11px] text-red-600">{uploadError}</p>}<p className="mt-1 text-[10px] text-slate-400">PDF, JPG, PNG or WebP · Maximum 2 MB</p></div>
+}
+
+function DeploymentEditor() {
+  const [deployment, setDeployment] = useState('')
+  useEffect(() => { const load = (event) => setDeployment(event.detail || ''); window.addEventListener('service-deployment-editor-value', load); return () => window.removeEventListener('service-deployment-editor-value', load) }, [])
+  const change = (value) => { setDeployment(value); window.dispatchEvent(new CustomEvent('service-deployment-selected', { detail: value })) }
+  return <label className="block text-xs font-semibold">Deployment *<select required value={deployment} onChange={(event) => change(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border bg-white px-3 text-sm font-normal"><option value="">Select Deployment</option><option value="cloud">Cloud</option><option value="on_prem">On-Prem</option><option value="hybrid">Hybrid</option></select></label>
+}
+
+function GlobalSellingEditor() {
+  const [selectedCountries, setSelectedCountries] = useState([])
+  const [allowedCountries, setAllowedCountries] = useState(null)
+  const [loadError, setLoadError] = useState('')
+  useEffect(() => { getSellingCountries().then((result) => setAllowedCountries(result.data.allowed_countries)).catch((error) => setLoadError(error.message)) }, [])
+  useEffect(() => {
+    const load = (event) => setSelectedCountries(event.detail.selling_countries || [])
+    window.addEventListener('service-selling-editor-value', load)
+    window.dispatchEvent(new CustomEvent('service-selling-changed', { detail: { sell_globally: true, selling_countries: [] } }))
+    return () => window.removeEventListener('service-selling-editor-value', load)
+  }, [])
+  const selectCountries = (countries) => {
+    setSelectedCountries(countries)
+    window.dispatchEvent(new CustomEvent('service-selling-changed', { detail: { sell_globally: true, selling_countries: countries } }))
+  }
+  return <div className="mt-4 rounded-md border border-indigo-100 bg-indigo-50/50 p-3"><CountryMultiSelect label="Select the country for provide services" value={selectedCountries} onChange={selectCountries} allowedCodes={allowedCountries} required/>{loadError && <p className="mt-2 text-xs text-red-600">{loadError}</p>}</div>
 }
 
 function StructuredSpecifications() {
@@ -156,7 +232,9 @@ function StructuredSpecifications() {
   const load = (context = {}) => {
     if (!context.service_type) { setDefinitions([]); return }
     getSpecifications({ service_type: context.service_type, category_id: context.category_id, subcategory_id: context.subcategory_id }).then((result) => {
-      setDefinitions(result.data || [])
+      // Deployment has its own required field above. Do not render the legacy
+      // specification with the same meaning a second time.
+      setDefinitions((result.data || []).filter((item) => !/^deployment(?:\s*\/\s*hosting)?$|^hosting$/i.test(item.name.trim())))
     }).catch(() => setDefinitions([]))
   }
   useEffect(() => {

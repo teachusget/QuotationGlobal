@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Industry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -20,7 +21,9 @@ class IndustryController extends Controller
 
     public function marketplace()
     {
-        return response()->json(['data' => Industry::where('status', 'active')->orderBy('name')->get()->map(fn ($industry) => $this->resource($industry))]);
+        $industries = Cache::remember('marketplace:industries', 600, fn () => Industry::where('status', 'active')->orderBy('name')->get()->map(fn ($industry) => $this->resource($industry)));
+        return response()->json(['data' => $industries])
+            ->header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
     }
 
     public function store(Request $request)

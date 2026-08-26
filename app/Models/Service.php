@@ -3,13 +3,31 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class Service extends Model
 {
-    protected $fillable = ['vendor_id', 'category_id', 'subcategory_id', 'industry_id', 'brand_id', 'name', 'features', 'image_data', 'service_type', 'ai_enabled', 'pricing_mode', 'price_from', 'monthly_price', 'discount_percent', 'billing_cycle'];
+    protected static function booted(): void
+    {
+        static::saved(function () {
+            Cache::put('marketplace:services:version', ((int) Cache::get('marketplace:services:version', 1)) + 1);
+            Cache::forget('marketplace:categories');
+            Cache::forget('marketplace:categories:v2');
+        });
+        static::deleted(function () {
+            Cache::put('marketplace:services:version', ((int) Cache::get('marketplace:services:version', 1)) + 1);
+            Cache::forget('marketplace:categories');
+            Cache::forget('marketplace:categories:v2');
+        });
+    }
+    protected $fillable = ['vendor_id', 'category_id', 'subcategory_id', 'industry_id', 'brand_id', 'name', 'sku', 'inventory_quantity', 'low_stock_threshold', 'track_inventory', 'features', 'image_data', 'certificates', 'service_type', 'deployment', 'ai_enabled', 'sell_globally', 'selling_countries', 'pricing_mode', 'price_from', 'monthly_price', 'discount_percent', 'billing_cycle'];
 
     protected $casts = [
         'ai_enabled' => 'boolean',
+        'sell_globally' => 'boolean',
+        'selling_countries' => 'array',
+        'certificates' => 'array',
+        'track_inventory' => 'boolean',
     ];
 
     public function vendor() { return $this->belongsTo(Vendor::class); }

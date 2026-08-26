@@ -6,8 +6,6 @@ use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
-use App\Http\Middleware\EnsureAdminAccount;
-use App\Http\Middleware\ExcludeBuyerAccount;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustProxies;
 use App\Http\Middleware\VerifyCsrfToken;
@@ -53,8 +51,6 @@ class Kernel extends HttpKernel
     protected $middlewareAliases = [
         'auth' => Authenticate::class,
         'guest' => RedirectIfAuthenticated::class,
-        'admin' => EnsureAdminAccount::class,
-        'not-buyer' => ExcludeBuyerAccount::class,
         'throttle' => ThrottleRequests::class,
         'permission' => PermissionMiddleware::class,
         'role' => RoleMiddleware::class,

@@ -8,6 +8,10 @@ export default class AppErrorBoundary extends Component {
     return { error }
   }
 
+  componentDidCatch(error, details) {
+    console.error('Application render error', error, details)
+  }
+
   render() {
     if (this.state.error) {
       return <main className="grid min-h-screen place-items-center bg-slate-50 p-6">

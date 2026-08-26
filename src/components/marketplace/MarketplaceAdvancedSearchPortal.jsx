@@ -1,0 +1,25 @@
+import { Building2, ChevronDown, CircleDollarSign, Cloud, Search, SlidersHorizontal } from 'lucide-react'
+
+const popular = ['ERP', 'CRM', 'HRMS', 'Hospital Management', 'Cloud', 'Cyber Security', 'POS', 'AI Solutions', 'Microsoft 365']
+
+function FilterSelect({ icon: Icon, label, value, options, onChange }) {
+  return <label className="relative min-w-0 border-t lg:border-l lg:border-t-0"><span className="sr-only">{label}</span><Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><select value={value} onChange={(event) => onChange(event.target.value)} className="h-12 w-full appearance-none bg-white pl-9 pr-8 text-xs font-medium text-slate-700 outline-none"><option value="All">{label}</option>{options.map((option) => <option key={option.value || option} value={option.value || option}>{option.label || option}</option>)}</select><ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"/></label>
+}
+
+export default function MarketplaceAdvancedSearchPortal({ filters, setters, options, resultCount }) {
+  const search = () => document.getElementById('marketplace-products')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  return <section className="marketplace-advanced-search rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-violet-50 p-3 text-slate-900 sm:p-5" aria-label="Advanced marketplace search">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 text-white shadow-lg shadow-blue-200"><SlidersHorizontal className="h-4 w-4"/></span><div><p className="text-xs font-extrabold uppercase tracking-[.14em] text-slate-800">Smart marketplace search</p><p className="mt-0.5 text-[11px] text-slate-500">Search once, then refine verified solutions.</p></div></div><span aria-live="polite" className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500"/>{resultCount} solutions found</span></div>
+    <div className="overflow-hidden rounded-xl border border-blue-100 bg-white shadow-sm lg:grid lg:grid-cols-[minmax(220px,1fr)_150px_145px_150px_145px_auto]">
+      <label className="relative block"><span className="sr-only">Search marketplace</span><Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={filters.query} onChange={(event) => setters.query(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') search() }} placeholder="Search solutions, brands, vendors, categories..." className="h-12 w-full pl-11 pr-3 text-xs outline-none"/></label>
+      <FilterSelect icon={Building2} label="Industry" value={filters.industry} options={options.industries} onChange={setters.industry}/>
+      <FilterSelect icon={SlidersHorizontal} label="Solution type" value={filters.serviceType} options={[{ value: 'software', label: 'Software' }, { value: 'hardware', label: 'Hardware' }, { value: 'services', label: 'Services' }]} onChange={setters.serviceType}/>
+      <FilterSelect icon={Cloud} label="Deployment" value={filters.deployment} options={options.deployments} onChange={setters.deployment}/>
+      <FilterSelect icon={CircleDollarSign} label="Budget" value={filters.budget} options={[{ value: '500', label: 'Up to $500' }, { value: '1000', label: 'Up to $1,000' }, { value: '5000', label: 'Up to $5,000' }, { value: '10000', label: 'Up to $10,000' }]} onChange={setters.budget}/>
+      <button type="button" onClick={search} className="m-1.5 h-9 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-6 text-xs font-bold text-white shadow-sm transition hover:from-blue-700 hover:to-violet-700 lg:h-auto">Search</button>
+    </div>
+    {options.companySizes.length > 0 && <div className="mt-2 grid overflow-hidden rounded-xl border bg-white sm:grid-cols-[150px_1fr]"><span className="flex items-center gap-2 px-4 py-3 text-xs font-bold text-slate-600"><Building2 className="h-4 w-4 text-primary"/>Company Size</span><select value={filters.companySize} onChange={(event) => setters.companySize(event.target.value)} className="h-11 border-t bg-white px-3 text-xs outline-none sm:border-l sm:border-t-0"><option value="All">All company sizes</option>{options.companySizes.map((option) => <option key={option} value={option}>{option}</option>)}</select></div>}
+    <div className="mt-3 flex flex-wrap items-center gap-2 px-1"><span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">Popular searches</span>{popular.map((term) => <button type="button" key={term} onClick={() => { setters.query(term); search() }} className="rounded-md border bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600 hover:border-primary hover:text-primary">{term}</button>)}</div>
+  </section>
+}

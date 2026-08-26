@@ -25,8 +25,9 @@ export default function LoginPage() {
     if (!loginName.trim() || !password) { setError('Enter your email and password.'); return }
     setSubmitting(true)
     try {
-      await login({ login: loginName.trim(), password, remember })
-      navigate(location.state?.from?.pathname || '/', { replace: true })
+      const response = await login({ login: loginName.trim(), password, remember })
+      const destination = location.state?.from?.pathname || (response.user?.account_type === 'buyer' ? '/marketplace' : response.user?.account_type === 'vendor' ? '/vendors' : '/')
+      navigate(destination, { replace: true })
     } catch (requestError) {
       setError(requestError.message)
     } finally {

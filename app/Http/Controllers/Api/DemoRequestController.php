@@ -12,8 +12,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class DemoRequestController extends Controller
 {
@@ -26,6 +28,8 @@ class DemoRequestController extends Controller
             $query->where('vendor_id', $vendor->id);
         } elseif ($request->user()->account_type === 'buyer') {
             $query->where('user_id', $request->user()->id);
+        } else {
+            $this->scopeAssignedVendors($request, $query);
         }
 
         $requests = $query->get();
@@ -45,9 +49,10 @@ class DemoRequestController extends Controller
     {
         $query = DemoRequest::with([
             'service:id,vendor_id,name,billing_cycle,pricing_mode,price_from,monthly_price,discount_percent',
-            'vendor:id,user_id,company_name,name,email,phone',
+            'vendor:id,user_id,company_name,name,email,phone,address,city,country',
             'user:id,name,email',
             'purchaseOrder',
+            'quoteSender:id,name,email,account_type',
         ])->where('request_type', 'quote')->latest();
 
         if ($request->user()->account_type === 'vendor') {
@@ -55,6 +60,12 @@ class DemoRequestController extends Controller
             $query->where('vendor_id', $vendor->id);
         } elseif ($request->user()->account_type === 'buyer') {
             $query->where('user_id', $request->user()->id);
+        } else {
+            $this->scopeAssignedVendors($request, $query);
+        }
+
+        if ($request->boolean('quotation_only')) {
+            return $this->paginatedQuotations($request, $query);
         }
 
         $requests = $query->get();
@@ -62,11 +73,66 @@ class DemoRequestController extends Controller
         return response()->json(['data' => $requests]);
     }
 
+    private function paginatedQuotations(Request $request, $query)
+    {
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:150'],
+            'status' => ['nullable', Rule::in(['quoted', 'quote_accepted', 'quote_declined', 'expired'])],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'sort' => ['nullable', Rule::in(['newest', 'oldest', 'amount_high', 'amount_low', 'expiry'])],
+            'per_page' => ['nullable', 'integer', Rule::in([25, 50, 100])],
+        ]);
+        $query->whereNotNull('quoted_at')
+            ->when($filters['search'] ?? null, function ($builder, $search) {
+                $builder->where(function ($searchQuery) use ($search) {
+                    $searchQuery->where('id', $search)
+                        ->orWhereHas('service', fn ($service) => $service->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('user', fn ($buyer) => $buyer->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"))
+                        ->orWhereHas('vendor', fn ($vendor) => $vendor->where('company_name', 'like', "%{$search}%")->orWhere('name', 'like', "%{$search}%"));
+                });
+            })
+            ->when($filters['date_from'] ?? null, fn ($builder, $date) => $builder->whereDate('quoted_at', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn ($builder, $date) => $builder->whereDate('quoted_at', '<=', $date));
+
+        $scoped = clone $query;
+        $counts = [
+            'total' => (clone $scoped)->count(),
+            'awaiting' => (clone $scoped)->where('status', 'quoted')->whereDate('quote_valid_until', '>=', today())->count(),
+            'accepted' => (clone $scoped)->where('status', 'quote_accepted')->count(),
+            'declined' => (clone $scoped)->where('status', 'quote_declined')->count(),
+            'expired' => (clone $scoped)->where('status', 'quoted')->whereDate('quote_valid_until', '<', today())->count(),
+        ];
+        $query->when(($filters['status'] ?? null) === 'expired', fn ($builder) => $builder->where('status', 'quoted')->whereDate('quote_valid_until', '<', today()))
+            ->when(($filters['status'] ?? null) && $filters['status'] !== 'expired', fn ($builder) => $builder->where('status', $filters['status']));
+        match ($filters['sort'] ?? 'newest') {
+            'oldest' => $query->reorder('quoted_at'),
+            'amount_high' => $query->reorder('quoted_price', 'desc'),
+            'amount_low' => $query->reorder('quoted_price'),
+            'expiry' => $query->reorder('quote_valid_until'),
+            default => $query->reorder('quoted_at', 'desc'),
+        };
+        $paginator = $query->paginate($filters['per_page'] ?? 25)->withQueryString();
+        return response()->json([
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(), 'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(), 'total' => $paginator->total(),
+                'from' => $paginator->firstItem(), 'to' => $paginator->lastItem(), 'counts' => $counts,
+            ],
+        ]);
+    }
+
     public function sendQuote(Request $request, DemoRequest $demoRequest)
     {
         abort_unless($request->user()->account_type === 'vendor', 403, 'Only the assigned vendor can send a quote.');
         $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
         abort_unless($demoRequest->request_type === 'quote' && $demoRequest->vendor_id === $vendor->id, 403);
+        if (! trim((string) $vendor->address) || ! trim((string) $vendor->city) || ! trim((string) $vendor->country)) {
+            throw ValidationException::withMessages([
+                'vendor_address' => ['Complete your business address, city and country in My Service Profile before sending a quotation.'],
+            ]);
+        }
         $data = $request->validate([
             'quoted_price' => ['required', 'numeric', 'min:0.01', 'max:999999999999.99'],
             'quote_message' => ['required', 'string', 'min:10', 'max:2000'],
@@ -76,6 +142,11 @@ class DemoRequestController extends Controller
             'quote_data.quotation_date' => ['nullable', 'date'],
             'quote_data.business_name' => ['nullable', 'string', 'max:150'],
             'quote_data.client_name' => ['nullable', 'string', 'max:150'],
+            'quote_data.vendor_details' => ['nullable', 'array'],
+            'quote_data.client_details' => ['nullable', 'array'],
+            'quote_data.shipping_details' => ['nullable', 'array'],
+            'quote_data.transport_details' => ['nullable', 'array'],
+            'quote_data.logo_data' => ['nullable', 'string', 'max:1500000', 'regex:/^data:image\/(png|jpeg|webp);base64,/i'],
             'quote_data.currency' => ['nullable', Rule::in(['PKR'])],
             'quote_data.discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'quote_data.subtotal' => ['nullable', 'numeric', 'min:0'],
@@ -90,11 +161,51 @@ class DemoRequestController extends Controller
             'quote_data.items.*.amount' => ['required_with:quote_data.items', 'numeric', 'min:0'],
             'quote_data.items.*.total' => ['required_with:quote_data.items', 'numeric', 'min:0'],
             'quote_valid_until' => ['required', 'date', 'after_or_equal:today'],
+            'vendor_attachment' => ['nullable', 'file', 'max:1024', 'mimes:pdf,doc,docx,xls,xlsx,png,jpg,jpeg,webp'],
         ]);
+        $attachment = $data['vendor_attachment'] ?? null;
+        unset($data['vendor_attachment']);
+        $quoteData = $data['quote_data'] ?? [];
+        $quoteData['vendor'] = [
+            'name' => $vendor->company_name ?: $vendor->name,
+            'email' => $vendor->email,
+            'phone' => $vendor->phone,
+            'address' => $vendor->address,
+            'city' => $vendor->city,
+            'country' => $vendor->country,
+        ];
+        $data['quote_data'] = $quoteData;
+        $versions = $demoRequest->quote_versions ?? [];
+        if ($demoRequest->quoted_at) {
+            $versions[] = [
+                'revision' => max(1, (int) $demoRequest->quote_revision),
+                'quoted_price' => $demoRequest->quoted_price,
+                'quote_message' => $demoRequest->quote_message,
+                'quote_terms' => $demoRequest->quote_terms,
+                'quote_data' => $demoRequest->quote_data,
+                'quote_valid_until' => optional($demoRequest->quote_valid_until)->toDateString(),
+                'quoted_at' => optional($demoRequest->quoted_at)->toISOString(),
+                'attachment_name' => $demoRequest->vendor_quote_attachment_name,
+                'attachment_path' => $demoRequest->vendor_quote_attachment_path,
+            ];
+        }
+        $attachmentData = [];
+        if ($attachment) {
+            $attachmentData = [
+                'vendor_quote_attachment_name' => $attachment->getClientOriginalName(),
+                'vendor_quote_attachment_path' => $attachment->store('vendor-quote-attachments'),
+                'vendor_quote_attachment_mime' => $attachment->getMimeType(),
+                'vendor_quote_attachment_size' => $attachment->getSize(),
+            ];
+        }
         $demoRequest->update([
             ...$data,
+            ...$attachmentData,
             'status' => 'quoted',
             'quoted_at' => now(),
+            'quote_sent_by' => $request->user()->id,
+            'quote_revision' => max(1, (int) $demoRequest->quote_revision + 1),
+            'quote_versions' => $versions,
             'buyer_quote_response_at' => null,
             'buyer_notification_read_at' => null,
         ]);
@@ -181,19 +292,45 @@ class DemoRequestController extends Controller
             'demo_at' => ['nullable', 'date', 'after:now', 'required_if:request_type,demo'],
             'quote_purpose' => ['nullable', 'required_if:request_type,quote', 'string', 'min:10', 'max:1500'],
             'expected_users' => ['nullable', 'required_if:request_type,quote', 'integer', 'min:1', 'max:1000000'],
+            'currently_using' => ['nullable', 'required_if:request_type,quote', Rule::in(['manual', 'spreadsheet', 'customized_in_house', 'brand'])],
+            'current_brand_name' => ['nullable', 'required_if:currently_using,brand', 'string', 'max:150'],
+            'attachment' => ['nullable', 'file', 'max:2048', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,csv,txt,rtf,odt,ods'],
         ]);
         $service = Service::findOrFail($data['service_id']);
         $requestRow = DemoRequest::updateOrCreate([
             'service_id' => $service->id,
             'user_id' => $request->user()->id,
             'request_type' => $data['request_type'],
-        ], ['vendor_id' => $service->vendor_id, 'demo_at' => $data['demo_at'] ?? null, 'quote_purpose' => $data['quote_purpose'] ?? null, 'expected_users' => $data['expected_users'] ?? null, 'status' => 'pending']);
+        ], ['vendor_id' => $service->vendor_id, 'demo_at' => $data['demo_at'] ?? null, 'quote_purpose' => $data['quote_purpose'] ?? null, 'expected_users' => $data['expected_users'] ?? null, 'currently_using' => $data['currently_using'] ?? null, 'current_brand_name' => ($data['currently_using'] ?? null) === 'brand' ? trim($data['current_brand_name']) : null, 'status' => 'pending']);
+
+        if ($request->hasFile('attachment') && $data['request_type'] === 'quote') {
+            if ($requestRow->buyer_attachment_path) Storage::disk('local')->delete($requestRow->buyer_attachment_path);
+            $file = $request->file('attachment');
+            $requestRow->update(['buyer_attachment_name' => $file->getClientOriginalName(), 'buyer_attachment_path' => $file->store('quote-request-attachments'), 'buyer_attachment_mime' => $file->getMimeType(), 'buyer_attachment_size' => $file->getSize()]);
+        }
 
         return response()->json(['message' => $data['request_type'] === 'demo' ? 'Demo request sent to the Solution Provider.' : 'Quote request sent successfully.', 'data' => $requestRow], $requestRow->wasRecentlyCreated ? 201 : 200);
     }
 
+    public function downloadBuyerAttachment(Request $request, DemoRequest $demoRequest)
+    {
+        $this->authorizeParticipant($request, $demoRequest);
+        abort_unless($demoRequest->request_type === 'quote' && $demoRequest->buyer_attachment_path, 404);
+        abort_unless(Storage::disk('local')->exists($demoRequest->buyer_attachment_path), 404);
+        return Storage::disk('local')->download($demoRequest->buyer_attachment_path, $demoRequest->buyer_attachment_name);
+    }
+
+    public function downloadVendorQuoteAttachment(Request $request, DemoRequest $demoRequest)
+    {
+        $this->authorizeParticipant($request, $demoRequest);
+        abort_unless($demoRequest->request_type === 'quote' && $demoRequest->vendor_quote_attachment_path, 404);
+        abort_unless(Storage::disk('local')->exists($demoRequest->vendor_quote_attachment_path), 404);
+        return Storage::disk('local')->download($demoRequest->vendor_quote_attachment_path, $demoRequest->vendor_quote_attachment_name);
+    }
+
     public function update(Request $request, DemoRequest $demoRequest)
     {
+        $this->authorizeStaffVendor($request, $demoRequest->vendor_id);
         $data = $request->validate([
             'status' => ['required', Rule::in(['accepted', 'rejected'])],
             'rejection_reason' => ['nullable', 'required_if:status,rejected', 'string', 'min:5', 'max:1000'],
@@ -302,6 +439,7 @@ class DemoRequestController extends Controller
 
     public function moderate(Request $request, DemoRequest $demoRequest)
     {
+        $this->authorizeStaffVendor($request, $demoRequest->vendor_id);
         $data = $request->validate([
             'participant' => ['required', Rule::in(['buyer', 'vendor'])],
             'blocked' => ['required', 'boolean'],
@@ -318,6 +456,7 @@ class DemoRequestController extends Controller
     private function authorizeParticipant(Request $request, DemoRequest $demoRequest): void
     {
         if (! in_array($request->user()->account_type, ['vendor', 'buyer'], true)) {
+            $this->authorizeStaffVendor($request, $demoRequest->vendor_id);
             return;
         }
 
@@ -328,5 +467,21 @@ class DemoRequestController extends Controller
         }
 
         abort_unless($demoRequest->user_id === $request->user()->id, 403);
+    }
+
+    private function scopeAssignedVendors(Request $request, $query): void
+    {
+        $user = $request->user();
+        if ($user->account_type === 'staff' && ! $user->isSuperAdmin()) {
+            $query->whereIn('vendor_id', $user->assignedVendors()->select('vendors.id'));
+        }
+    }
+
+    private function authorizeStaffVendor(Request $request, ?int $vendorId): void
+    {
+        $user = $request->user();
+        if ($user->account_type === 'staff' && ! $user->isSuperAdmin()) {
+            abort_unless($vendorId && $user->assignedVendors()->whereKey($vendorId)->exists(), 403, 'This request belongs to a vendor that is not assigned to you.');
+        }
     }
 }

@@ -99,6 +99,9 @@ class AuthController extends Controller
 
     public function impersonateVendor(Request $request, Vendor $vendor)
     {
+        if (! $request->user()->isSuperAdmin()) {
+            abort_unless($request->user()->assignedVendors()->whereKey($vendor->id)->exists(), 403, 'This vendor is not assigned to you.');
+        }
         $vendorUser = $vendor->user;
         abort_unless($vendorUser && $vendorUser->account_type === 'vendor', 422, 'This vendor does not have a linked login account.');
 
@@ -228,6 +231,7 @@ class AuthController extends Controller
     {
         $user->load(['roles:id,name', 'vendorProfile']);
         if ($user->account_type === 'vendor' && $user->vendorProfile) {
+            $user->setAttribute('vendor_id', $user->vendorProfile->id);
             foreach (['company_name', 'address', 'city', 'country'] as $field) {
                 if (! $user->{$field}) $user->setAttribute($field, $user->vendorProfile->{$field});
             }

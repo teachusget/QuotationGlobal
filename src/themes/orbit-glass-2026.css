@@ -1,0 +1,8 @@
+.marketplace-shell-orbit-glass-2026 {
+  --theme-accent: #3157e8;
+  --theme-accent-secondary: #0891b2;
+}
+
+.marketplace-page-orbit-glass-2026 .legacy-marketplace-hero {
+  transition: background-color .2s ease, box-shadow .2s ease;
+}

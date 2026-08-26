@@ -17,7 +17,7 @@ export default function CategoryBrowser({ categories, selected, onSelect, loadin
     }))
   )
 
-  return <div className="mt-9 rounded-2xl border bg-white px-4 py-6 shadow-subtle sm:px-6">
+  return <div className="marketplace-category-browser mt-9 rounded-2xl border bg-white px-4 py-6 shadow-subtle sm:px-6">
     <div className="text-center">
       <p className="text-xs font-bold uppercase tracking-wider text-primary">Browse faster</p>
       <h2 className="mt-1 text-2xl font-bold">Popular solution subcategories</h2>

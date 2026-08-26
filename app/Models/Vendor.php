@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Vendor extends Model
 {
@@ -47,5 +48,10 @@ class Vendor extends Model
     public function services()
     {
         return $this->hasMany(Service::class);
+    }
+
+    public function assignedUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_vendor_assignments')->withTimestamps();
     }
 }

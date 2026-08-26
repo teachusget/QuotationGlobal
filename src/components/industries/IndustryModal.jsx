@@ -45,8 +45,8 @@ export default function IndustryModal({ open, industry, saving, serverError, onC
       setError('Logo must be PNG, JPG or WebP.')
       return
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Logo size must be 2 MB or less.')
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Logo source must be 10 MB or less.')
       return
     }
 
@@ -103,7 +103,7 @@ export default function IndustryModal({ open, industry, saving, serverError, onC
             <label className="mb-1.5 block text-xs font-semibold">Logo <span className="font-normal text-slate-400">(optional)</span></label>
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => chooseLogo(event.target.files[0])} className="sr-only"/>
             <button type="button" onClick={() => fileRef.current?.click()} className="flex min-h-28 w-full items-center justify-center rounded-md border border-dashed bg-slate-50 p-3 text-slate-500 hover:border-primary hover:bg-blue-50">
-              {preview ? <img src={preview} alt="Industry logo preview" className="h-20 w-20 rounded-md object-contain"/> : <span className="flex flex-col items-center gap-1.5 text-xs"><ImagePlus className="h-5 w-5"/>Upload PNG, JPG or WebP<span className="text-[11px] text-slate-400">Maximum 2 MB</span></span>}
+              {preview ? <img src={preview} alt="Industry logo preview" className="h-20 w-20 rounded-md object-contain"/> : <span className="flex flex-col items-center gap-1.5 text-xs"><ImagePlus className="h-5 w-5"/>Upload PNG, JPG or WebP<span className="text-[11px] text-slate-400">Auto-compressed, maximum source 10 MB</span></span>}
             </button>
           </div>
           {visibleError && <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{visibleError}</p>}

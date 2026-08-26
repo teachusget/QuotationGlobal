@@ -23,6 +23,19 @@ class RouteServiceProvider extends ServiceProvider
 
     protected function configureRateLimiting()
     {
-        RateLimiter::for('api', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
+        RateLimiter::for('api', function (Request $request) {
+            $token = $request->bearerToken();
+            $key = $token ? 'token:'.hash('sha256', $token) : 'ip:'.$request->ip();
+            return Limit::perMinute($token ? 300 : 120)->by($key);
+        });
+        RateLimiter::for('marketplace-media', fn (Request $request) => Limit::perMinute(2000)->by(
+            'media:'.$request->ip()
+        ));
+        RateLimiter::for('authentication', fn (Request $request) => Limit::perMinute(10)->by(
+            $request->ip().'|'.mb_strtolower((string) ($request->input('login') ?: $request->input('email')))
+        ));
+        RateLimiter::for('password-reset', fn (Request $request) => Limit::perMinute(5)->by(
+            $request->ip().'|'.mb_strtolower((string) $request->input('email'))
+        ));
     }
 }

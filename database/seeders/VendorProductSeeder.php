@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Industry;
+use App\Models\MarketplacePage;
 use App\Models\Service;
 use App\Models\ServiceImage;
 use App\Models\User;
@@ -12,6 +13,7 @@ use App\Models\Vendor;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use App\Support\MarketplaceDefaults;
 
 class VendorProductSeeder extends Seeder
 {
@@ -97,6 +99,13 @@ class VendorProductSeeder extends Seeder
         $seededVendors = Vendor::whereIn('email', $emails)->withCount('services')->get();
         if ($seededVendors->count() !== 10 || $seededVendors->sum('services_count') !== 20 || $seededVendors->contains(fn ($vendor) => $vendor->services_count !== 2)) {
             throw new \RuntimeException('Vendor product seed verification failed: expected 10 vendors with exactly 2 products each.');
+        }
+        $page = MarketplacePage::where('slug', 'home')->with('publishedVersion')->first();
+        $hasCatalog = collect($page?->draft_document['sections'] ?? [])->contains(fn ($section) => ! empty($section['settings']['catalog_ids'] ?? []));
+        if ($page && ! $hasCatalog && $page->publishedVersion?->version_number === 1) {
+            $document = MarketplaceDefaults::document();
+            $page->update(['draft_document' => $document]);
+            $page->publishedVersion->update(['document' => $document]);
         }
         $this->command?->info('Verified: 10 vendors and 20 products (2 products per vendor).');
     }

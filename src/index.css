@@ -60,6 +60,30 @@
   .brand-marquee-track { animation-play-state: paused; }
 }
 
+/* Published marketplace design tokens are scoped away from the admin shell. */
+.marketplace-public-shell,
+.marketplace-renderer {
+  color: var(--market-text, #0f172a);
+}
+.marketplace-public-shell.bg-canvas,
+.marketplace-renderer { background-color: var(--market-canvas, #f6f8fc); }
+.marketplace-renderer [data-market-surface] { background-color: var(--market-surface, #fff); }
+.marketplace-renderer .market-rich-text { color: var(--market-muted, #64748b); }
+.marketplace-public-shell > header,
+.marketplace-public-shell footer,
+.marketplace-renderer .bg-white { background-color: var(--market-surface, #fff); }
+.marketplace-public-shell .bg-primary,
+.marketplace-renderer .bg-primary { background-color: var(--market-primary, #0b6ff4); }
+.marketplace-public-shell .text-primary,
+.marketplace-renderer .text-primary { color: var(--market-primary, #0b6ff4); }
+.marketplace-public-shell .border-primary,
+.marketplace-renderer .border-primary { border-color: var(--market-primary, #0b6ff4); }
+.marketplace-renderer.marketplace-radius-square :is(.rounded-lg,.rounded-xl,.rounded-2xl) { border-radius: 0; }
+.marketplace-renderer.marketplace-radius-soft :is(.rounded-xl,.rounded-2xl) { border-radius: .5rem; }
+.marketplace-renderer.marketplace-container-compact { margin-inline: auto; max-width: 1120px; }
+.marketplace-renderer.marketplace-container-wide { margin-inline: auto; max-width: 1440px; }
+.marketplace-renderer.marketplace-container-full { max-width: none; }
+
 /* Admin and vendor dashboard dark theme. Existing utility colors are mapped here
    so every current module, modal and data table follows the selected appearance. */
 html.dark, html.dark body { background: #08111f; color: #e2e8f0; }
@@ -97,6 +121,58 @@ html.dark .swal2-actions { gap: .5rem; }
 html.dark .swal2-popup, html.dark .swal2-confirm, html.dark .swal2-cancel { border-radius: .75rem; }
 
 .document-surface { color-scheme: light; }
+
+/* Vendor CRM is a compact single-table view; admin keeps the full audit table. */
+.customer-vendor-view .ui-toolbar > div {
+  width: 100%;
+}
+
+.customer-vendor-view .ui-toolbar > div > div {
+  flex: none;
+  overflow: visible;
+}
+
+.customer-vendor-view .ui-toolbar label {
+  min-width: 16rem;
+  flex: 1 1 22rem;
+  margin-left: auto;
+}
+
+.customer-vendor-view .customer-data-table {
+  width: 100%;
+  min-width: 0 !important;
+  table-layout: auto;
+}
+
+.customer-vendor-view .customer-data-table th:nth-child(4),
+.customer-vendor-view .customer-data-table td:nth-child(4),
+.customer-vendor-view .customer-data-table th:nth-child(5),
+.customer-vendor-view .customer-data-table td:nth-child(5),
+.customer-vendor-view .customer-data-table th:nth-child(9),
+.customer-vendor-view .customer-data-table td:nth-child(9),
+.customer-vendor-view .customer-data-table th:nth-child(10),
+.customer-vendor-view .customer-data-table td:nth-child(10) {
+  display: none;
+}
+
+.customer-vendor-view .customer-data-table th,
+.customer-vendor-view .customer-data-table td {
+  white-space: nowrap;
+}
+
+.customer-vendor-view .customer-data-table th:first-child,
+.customer-vendor-view .customer-data-table td:first-child {
+  width: 28%;
+  white-space: normal;
+}
+
+.customer-vendor-view .customer-data-table th:nth-child(2),
+.customer-vendor-view .customer-data-table td:nth-child(2) {
+  width: 28%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 html.dark .document-surface { background: #fff; color: #0f172a; }
 html.dark .document-surface .bg-white { background: #fff; }
 html.dark .document-surface .bg-slate-50 { background: #f8fafc; }
@@ -223,3 +299,834 @@ html.dark form[class*="max-h-[92vh]"] > div:first-child h2 { color: #f1f5f9; }
 
 /* Legacy free-text feature field was replaced by structured comparison fields. */
 form[class*="max-h-[92vh]"] div:has(> label > textarea[maxlength="5000"]) { display: none; }
+/* Marketplace search lives in the global header; avoid a duplicate field in the hero. */
+.legacy-marketplace-hero form {
+  display: none;
+}
+
+.legacy-marketplace-hero form + div {
+  margin-top: 1.75rem;
+}
+
+/* Modern marketplace hero: layered aurora, grid texture and glass surfaces. */
+.legacy-marketplace-hero {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  background:
+    radial-gradient(circle at 82% 15%, rgb(56 189 248 / 0.32), transparent 28%),
+    radial-gradient(circle at 12% 88%, rgb(37 99 235 / 0.38), transparent 34%),
+    linear-gradient(125deg, #061b46 0%, #073b91 48%, #087fae 100%) !important;
+  box-shadow: 0 28px 70px -34px rgb(2 32 89 / 0.75);
+}
+
+.legacy-marketplace-hero::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: '';
+  opacity: 0.2;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.15) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
+}
+
+.legacy-marketplace-hero::after {
+  position: absolute;
+  z-index: -1;
+  right: -8rem;
+  bottom: -10rem;
+  width: 28rem;
+  height: 28rem;
+  border-radius: 9999px;
+  content: '';
+  background: rgb(34 211 238 / 0.2);
+  filter: blur(60px);
+}
+
+.legacy-marketplace-hero > div:first-child {
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 2.25rem;
+  padding: 0.45rem;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1);
+  backdrop-filter: blur(16px);
+}
+
+.legacy-marketplace-hero > div:first-child > span {
+  padding-inline: 0.65rem;
+}
+
+.legacy-marketplace-hero h1 {
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  text-shadow: 0 3px 24px rgb(0 0 0 / 0.18);
+}
+
+.hero-gradient-text {
+  background: linear-gradient(90deg, #38bdf8 0%, #818cf8 52%, #c026d3 100%);
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-ad-stage .featured-ads-carousel {
+  z-index: 3;
+  width: min(100%, 25rem);
+}
+
+.hero-discovery + div {
+  margin-top: 1.25rem !important;
+}
+
+.hero-ad-stage {
+  min-height: 21rem !important;
+}
+
+.hero-stats {
+  margin-top: 1.25rem !important;
+}
+
+.hero-neon-cube {
+  position: absolute;
+  z-index: 1;
+  width: 5.5rem;
+  height: 5.5rem;
+  border: 1px solid rgb(125 211 252 / 0.55);
+  background: linear-gradient(145deg, rgb(37 99 235 / 0.55), rgb(168 85 247 / 0.7));
+  box-shadow: inset 0 0 25px rgb(255 255 255 / 0.2), 0 0 35px rgb(124 58 237 / 0.55);
+  transform: rotate(30deg) skew(-8deg);
+}
+
+.hero-neon-cube::after {
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgb(255 255 255 / 0.28);
+  content: '';
+}
+
+.hero-neon-cube-one { left: -1.5rem; bottom: 4.5rem; }
+.hero-neon-cube-two { left: 2.5rem; bottom: 0.5rem; width: 7rem; height: 7rem; opacity: 0.78; }
+
+.hero-neon-orb {
+  position: absolute;
+  z-index: 2;
+  left: -3rem;
+  bottom: -0.25rem;
+  width: 3.25rem;
+  height: 3.25rem;
+  border: 1px solid rgb(255 255 255 / 0.65);
+  border-radius: 9999px;
+  background: radial-gradient(circle at 30% 25%, #e0f2fe, #38bdf8 25%, #4f46e5 75%);
+  box-shadow: 0 0 32px rgb(56 189 248 / 0.8);
+}
+
+.hero-stat-icon {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
+  place-items: center;
+  border-radius: 9999px;
+  color: white;
+}
+
+.hero-stat-blue { background: linear-gradient(135deg, #2563eb, #6366f1); }
+.hero-stat-emerald { background: linear-gradient(135deg, #059669, #22c55e); }
+.hero-stat-amber { background: linear-gradient(135deg, #f59e0b, #f97316); }
+.hero-stat-violet { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+
+.legacy-marketplace-hero form {
+  border: 1px solid rgb(255 255 255 / 0.55);
+  box-shadow: 0 18px 45px -18px rgb(1 19 55 / 0.75);
+}
+
+.legacy-marketplace-hero .brand-marquee {
+  background: linear-gradient(90deg, rgb(3 22 60 / 0.44), rgb(3 63 105 / 0.28));
+  backdrop-filter: blur(12px);
+}
+
+.featured-ads-carousel {
+  margin-right: 0 !important;
+  margin-left: auto !important;
+  border-color: rgb(255 255 255 / 0.4) !important;
+  box-shadow: 0 28px 65px -24px rgb(0 14 52 / 0.8), 0 0 0 8px rgb(255 255 255 / 0.08);
+}
+
+.featured-ad-main {
+  min-height: 10.75rem;
+  padding: 1.15rem 1.35rem !important;
+  background:
+    radial-gradient(circle at 85% 15%, rgb(196 181 253 / 0.35), transparent 32%),
+    linear-gradient(145deg, #f8fbff, #eef4ff) !important;
+}
+
+.featured-ad-main > div:first-of-type {
+  width: 4rem !important;
+  height: 4rem !important;
+}
+
+.featured-ad-main > h2 {
+  margin-top: 0.8rem !important;
+}
+
+.featured-ads-carousel > .grid.grid-cols-4 {
+  padding-block: 0.75rem !important;
+}
+
+.featured-ads-carousel > div:last-child {
+  padding-block: 0.65rem !important;
+}
+
+@media (min-width: 1024px) {
+  .legacy-marketplace-hero {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  .legacy-marketplace-hero h1 {
+    margin-top: 0.85rem !important;
+    font-size: clamp(2.35rem, 3.15vw, 3.2rem) !important;
+    line-height: 1.05 !important;
+  }
+
+  .legacy-marketplace-hero h1 + p {
+    margin-top: 0.75rem !important;
+  }
+
+  .legacy-marketplace-hero h1 + p ~ div {
+    margin-top: 1.15rem !important;
+  }
+
+  .hero-stats > div {
+    padding-block: 0.75rem !important;
+  }
+}
+
+.featured-ads-carousel > div:first-of-type {
+  background:
+    radial-gradient(circle at 50% 15%, rgb(219 234 254 / 0.85), transparent 45%),
+    linear-gradient(145deg, #f8fbff, #eef5ff);
+}
+
+.featured-ads-carousel > div:first-of-type > img {
+  max-width: 86% !important;
+  max-height: 86% !important;
+  transform: none !important;
+}
+
+.featured-ads-carousel > div:first-of-type > span {
+  right: 1rem;
+  left: auto !important;
+}
+
+@media (max-width: 640px) {
+  .legacy-marketplace-hero > div:first-child {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    border-radius: 1rem;
+  }
+}
+
+/* Orbit Glass 2026 — clean editorial marketplace with bento glass surfaces. */
+.marketplace-theme-orbit-glass-2026 {
+  color: #172033;
+  border-color: rgb(30 64 175 / 0.12);
+  background:
+    radial-gradient(circle at 88% 12%, rgb(167 243 208 / 0.9), transparent 26%),
+    radial-gradient(circle at 4% 92%, rgb(191 219 254 / 0.75), transparent 30%),
+    linear-gradient(130deg, #f8fafc 0%, #eef2ff 52%, #ecfeff 100%) !important;
+  box-shadow: 0 28px 70px -38px rgb(30 64 175 / 0.4);
+}
+
+.marketplace-theme-orbit-glass-2026::before {
+  opacity: 0.5;
+  background-image: radial-gradient(rgb(37 99 235 / 0.2) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(120deg, transparent 15%, black 70%, transparent);
+}
+
+.marketplace-theme-orbit-glass-2026::after {
+  right: 30%;
+  bottom: -14rem;
+  background: rgb(99 102 241 / 0.16);
+}
+
+.marketplace-theme-orbit-glass-2026 .hero-discovery {
+  border-color: rgb(30 64 175 / 0.1);
+  background: rgb(255 255 255 / 0.68);
+  box-shadow: 0 12px 30px -20px rgb(30 64 175 / 0.35);
+}
+
+.marketplace-theme-orbit-glass-2026 .hero-discovery > span {
+  color: #fff;
+  border: 0;
+  background: #172554;
+  box-shadow: none;
+}
+
+.marketplace-theme-orbit-glass-2026 .hero-discovery a { color: #334155; }
+.marketplace-theme-orbit-glass-2026 .hero-discovery a:hover { color: #1d4ed8; background: #dbeafe; }
+.marketplace-theme-orbit-glass-2026 h1 { color: #101828; text-shadow: none; }
+.marketplace-theme-orbit-glass-2026 .hero-gradient-text {
+  background: linear-gradient(90deg, #2563eb, #4f46e5 55%, #0891b2);
+  background-clip: text;
+  color: transparent;
+}
+
+.marketplace-theme-orbit-glass-2026 h1 + p,
+.marketplace-theme-orbit-glass-2026 h1 + p ~ div { color: #475569; }
+.marketplace-theme-orbit-glass-2026 h1 + p ~ div span[class*='border-white'] {
+  color: #1d4ed8;
+  border-color: rgb(37 99 235 / 0.12);
+  background: rgb(255 255 255 / 0.72);
+}
+
+.marketplace-theme-orbit-glass-2026 a[href='#marketplace-products']:last-child {
+  color: #172554;
+  border-color: rgb(30 64 175 / 0.2);
+  background: rgb(255 255 255 / 0.72);
+}
+
+.marketplace-theme-orbit-glass-2026 .hero-neon-cube {
+  border-color: rgb(37 99 235 / 0.2);
+  background: linear-gradient(145deg, rgb(255 255 255 / 0.75), rgb(165 243 252 / 0.65));
+  box-shadow: inset 0 0 25px rgb(255 255 255 / 0.8), 0 18px 45px rgb(37 99 235 / 0.18);
+}
+
+.marketplace-theme-orbit-glass-2026 .hero-neon-orb {
+  border-color: white;
+  background: radial-gradient(circle at 30% 25%, #fff, #a7f3d0 32%, #2563eb 88%);
+  box-shadow: 0 14px 34px rgb(37 99 235 / 0.25);
+}
+
+.marketplace-theme-orbit-glass-2026 .featured-ads-carousel {
+  border-color: rgb(255 255 255 / 0.9) !important;
+  box-shadow: 0 28px 70px -30px rgb(30 64 175 / 0.4), 0 0 0 8px rgb(255 255 255 / 0.45);
+}
+
+.marketplace-theme-orbit-glass-2026 .featured-ad-main {
+  background:
+    radial-gradient(circle at 90% 10%, rgb(167 243 208 / 0.45), transparent 35%),
+    linear-gradient(145deg, #fff, #f8fafc) !important;
+}
+
+.marketplace-theme-orbit-glass-2026 .hero-stats {
+  color: #172033;
+  border-color: rgb(30 64 175 / 0.1);
+  background: rgb(255 255 255 / 0.72);
+  box-shadow: 0 18px 45px -28px rgb(30 64 175 / 0.35);
+}
+
+.marketplace-theme-orbit-glass-2026 .hero-stats small { color: #64748b; }
+
+/* Orbit Glass is a complete marketplace system, not only a hero skin. */
+.marketplace-shell-orbit-glass-2026 {
+  --market-primary: #3157e8 !important;
+  --market-secondary: #0891b2 !important;
+  --market-canvas: #f3f6fb !important;
+  --market-surface: #ffffff !important;
+  --market-text: #172033 !important;
+  color: #172033;
+  background:
+    radial-gradient(circle at 5% 18%, rgb(219 234 254 / 0.65), transparent 22rem),
+    radial-gradient(circle at 95% 45%, rgb(204 251 241 / 0.48), transparent 24rem),
+    #f3f6fb !important;
+}
+
+.marketplace-shell-orbit-glass-2026 > header,
+.marketplace-shell-orbit-glass-2026 .app-header {
+  border-color: rgb(148 163 184 / 0.18) !important;
+  background: rgb(255 255 255 / 0.82) !important;
+  box-shadow: 0 10px 35px -28px rgb(30 64 175 / 0.45) !important;
+  backdrop-filter: blur(20px) saturate(1.4);
+}
+
+.marketplace-shell-orbit-glass-2026 main > section > .marketplace-category-browser,
+.marketplace-shell-orbit-glass-2026 #marketplace-products,
+.marketplace-shell-orbit-glass-2026 main > section > div[class*='grid'][class*='md:grid-cols-3'] > div {
+  border-color: rgb(148 163 184 / 0.16) !important;
+  background: rgb(255 255 255 / 0.78) !important;
+  box-shadow: 0 24px 55px -40px rgb(30 64 175 / 0.4) !important;
+  backdrop-filter: blur(14px);
+}
+
+.marketplace-shell-orbit-glass-2026 .marketplace-category-browser {
+  overflow: hidden;
+  border-radius: 1.75rem !important;
+}
+
+.marketplace-shell-orbit-glass-2026 .marketplace-category-browser::before {
+  display: block;
+  width: 4rem;
+  height: 0.3rem;
+  margin: -0.4rem auto 1rem;
+  border-radius: 9999px;
+  content: '';
+  background: linear-gradient(90deg, #3157e8, #14b8a6);
+}
+
+.marketplace-shell-orbit-glass-2026 .marketplace-category-browser button[class*='min-h-[92px]'] {
+  border-color: transparent !important;
+  border-radius: 1rem !important;
+  background: #f7f9fd !important;
+  box-shadow: inset 0 0 0 1px rgb(148 163 184 / 0.12);
+}
+
+.marketplace-shell-orbit-glass-2026 .marketplace-category-browser button[class*='min-h-[92px]']:hover {
+  border-color: rgb(49 87 232 / 0.22) !important;
+  background: #fff !important;
+  box-shadow: 0 16px 28px -20px rgb(49 87 232 / 0.38);
+}
+
+.marketplace-shell-orbit-glass-2026 #marketplace-products {
+  border-radius: 1.75rem !important;
+}
+
+.marketplace-shell-orbit-glass-2026 #marketplace-products .ui-table-shell,
+.marketplace-shell-orbit-glass-2026 a[href^='/marketplace/services/'] {
+  border-color: rgb(148 163 184 / 0.16) !important;
+  border-radius: 1.25rem !important;
+  background: rgb(255 255 255 / 0.9) !important;
+  box-shadow: 0 20px 42px -34px rgb(30 64 175 / 0.42) !important;
+}
+
+.marketplace-shell-orbit-glass-2026 a[href^='/marketplace/services/']:hover {
+  border-color: rgb(49 87 232 / 0.28) !important;
+  box-shadow: 0 26px 48px -30px rgb(49 87 232 / 0.42) !important;
+}
+
+.marketplace-shell-orbit-glass-2026 a[href^='/marketplace/services/'] > div:first-child {
+  background:
+    radial-gradient(circle at 75% 15%, rgb(204 251 241 / 0.5), transparent 36%),
+    linear-gradient(145deg, #f8fafc, #eef2ff) !important;
+}
+
+.marketplace-shell-orbit-glass-2026 .bg-primary {
+  background: linear-gradient(110deg, #3157e8, #4f46e5) !important;
+}
+
+.marketplace-shell-orbit-glass-2026 .text-primary { color: #3157e8 !important; }
+.marketplace-shell-orbit-glass-2026 .border-primary { border-color: #3157e8 !important; }
+
+.marketplace-shell-orbit-glass-2026 .marketplace-footer {
+  margin-top: 2rem;
+  color: #cbd5e1;
+  border-color: rgb(255 255 255 / 0.08) !important;
+  background:
+    radial-gradient(circle at 82% 0%, rgb(49 87 232 / 0.28), transparent 25rem),
+    #111827 !important;
+}
+
+.marketplace-shell-orbit-glass-2026 .marketplace-footer .text-slate-500 { color: #94a3b8 !important; }
+.marketplace-shell-orbit-glass-2026 .marketplace-footer button,
+.marketplace-shell-orbit-glass-2026 .marketplace-footer h3 { color: #f8fafc; }
+.marketplace-shell-orbit-glass-2026 .marketplace-footer form {
+  border-color: rgb(255 255 255 / 0.12);
+  background: rgb(255 255 255 / 0.06);
+}
+
+.marketplace-shell-orbit-glass-2026 .marketplace-footer input {
+  color: #172033;
+  background: #fff;
+}
+
+@media (max-width: 768px) {
+  .marketplace-shell-orbit-glass-2026 .marketplace-category-browser,
+  .marketplace-shell-orbit-glass-2026 #marketplace-products { border-radius: 1.25rem !important; }
+}
+
+@media (min-width: 1024px) {
+  .marketplace-page-orbit-glass-2026 .legacy-marketplace-hero {
+    border-radius: 2.25rem !important;
+    padding-inline: clamp(2rem, 4vw, 4.5rem) !important;
+  }
+
+  .marketplace-page-orbit-glass-2026 .hero-discovery {
+    width: 100%;
+    justify-content: center;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .marketplace-page-orbit-glass-2026 .hero-discovery > span {
+    margin-right: auto;
+  }
+
+  .marketplace-page-orbit-glass-2026 .hero-discovery::after {
+    width: 5rem;
+    height: 1px;
+    margin-left: auto;
+    content: '';
+    background: rgb(49 87 232 / 0.25);
+  }
+
+  .marketplace-page-orbit-glass-2026 .hero-ad-stage {
+    justify-content: flex-end;
+  }
+
+  .marketplace-page-orbit-glass-2026 .featured-ads-carousel {
+    border-radius: 2rem !important;
+    transform: rotate(1.25deg);
+  }
+
+  .marketplace-page-orbit-glass-2026 .featured-ads-carousel:hover {
+    transform: rotate(0) translateY(-4px);
+  }
+
+  .marketplace-page-orbit-glass-2026 .hero-neon-cube-one {
+    left: 1rem;
+    bottom: 7rem;
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+
+  .marketplace-page-orbit-glass-2026 .hero-stats {
+    position: relative;
+    z-index: 5;
+    margin-right: 3rem;
+    margin-left: 3rem;
+    border-radius: 1.5rem;
+    transform: translateY(0.2rem);
+  }
+
+  .marketplace-page-orbit-glass-2026 .marketplace-category-browser {
+    display: grid;
+    grid-template-columns: 14rem minmax(0, 1fr);
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem !important;
+    text-align: left;
+  }
+
+  .marketplace-page-orbit-glass-2026 .marketplace-category-browser::before {
+    display: none;
+  }
+
+  .marketplace-page-orbit-glass-2026 .marketplace-category-browser > div:first-child {
+    text-align: left;
+  }
+
+  .marketplace-page-orbit-glass-2026 .marketplace-category-browser > div:nth-child(2) {
+    display: grid;
+    grid-auto-columns: 8.5rem;
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    gap: 0.75rem;
+    margin-top: 0 !important;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    padding: 0.25rem 0.25rem 0.6rem;
+    scrollbar-width: thin;
+  }
+
+  .marketplace-page-orbit-glass-2026 .marketplace-category-browser > div:last-child {
+    grid-column: 1;
+    margin-top: -2.75rem !important;
+    text-align: left;
+  }
+
+  .marketplace-page-orbit-glass-2026 #marketplace-products {
+    padding: 2rem !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none;
+  }
+
+  .marketplace-page-orbit-glass-2026 #marketplace-products > div:nth-of-type(2) {
+    grid-auto-flow: dense;
+  }
+
+  .marketplace-page-orbit-glass-2026 #marketplace-products > div:nth-of-type(2) > a:first-of-type {
+    grid-column: span 2;
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    min-height: 22rem;
+  }
+
+  .marketplace-page-orbit-glass-2026 #marketplace-products > div:nth-of-type(2) > a:first-of-type > div:first-child {
+    height: 100% !important;
+    min-height: 22rem !important;
+    border-right: 1px solid rgb(148 163 184 / 0.15);
+    border-bottom: 0;
+  }
+
+  .marketplace-page-orbit-glass-2026 #marketplace-products > div:nth-of-type(2) > a:first-of-type > div:last-child {
+    padding: 2rem;
+  }
+
+  .marketplace-page-orbit-glass-2026 #marketplace-products + div {
+    overflow: hidden;
+    gap: 0 !important;
+    border-radius: 2rem;
+    color: #e2e8f0;
+    background:
+      radial-gradient(circle at 85% 15%, rgb(49 87 232 / 0.38), transparent 18rem),
+      #111827;
+  }
+
+  .marketplace-page-orbit-glass-2026 #marketplace-products + div > div {
+    min-height: 12rem;
+    border: 0 !important;
+    border-right: 1px solid rgb(255 255 255 / 0.08) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .marketplace-page-orbit-glass-2026 #marketplace-products + div h3 { color: #fff; }
+  .marketplace-page-orbit-glass-2026 #marketplace-products + div p { color: #94a3b8; }
+}
+
+/* Keep product artwork inside one consistent media frame on listing cards. */
+a[href^='/marketplace/services/'] > div:first-child {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 11rem !important;
+  min-height: 11rem !important;
+  overflow: hidden !important;
+  contain: layout paint;
+  padding: 1rem;
+  background: #f8fafc;
+}
+
+a[href^='/marketplace/services/'] > div:first-child > img {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: scale-down !important;
+  object-position: center !important;
+  transform: scale(1.45);
+  transform-origin: center;
+}
+
+@media (min-width: 1280px) {
+  .buyer-header-search-center {
+    justify-content: flex-start !important;
+    gap: 1.25rem;
+  }
+
+  .buyer-header-search-center > nav {
+    order: 2;
+    gap: 1rem;
+  }
+
+  .buyer-header-search-center > nav > a:nth-of-type(2),
+  .buyer-header-search-center > nav > a:nth-of-type(3) {
+    display: none;
+  }
+
+  .buyer-header-search {
+    order: 1;
+    flex: 0 0 auto;
+  }
+
+  .buyer-header-search form {
+    width: 230px;
+  }
+
+  .buyer-header-search form:focus-within {
+    width: 270px;
+  }
+}
+form[aria-label="Request a quotation"] {
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+form[aria-label="Request a quotation"] > div:last-child {
+  position: sticky;
+  bottom: -1.5rem;
+  z-index: 5;
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  padding: 1rem 1.5rem 1.5rem;
+  border-top: 1px solid rgb(226 232 240);
+  background: rgb(255 255 255 / 0.96);
+  backdrop-filter: blur(8px);
+}
+[aria-label="Close preview"] {
+  position: fixed !important;
+  top: 1.25rem !important;
+  right: 1.25rem !important;
+  z-index: 110 !important;
+  display: inline-flex !important;
+  width: auto !important;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1rem !important;
+  border: 1px solid rgb(255 255 255 / 0.45);
+  box-shadow: 0 12px 32px rgb(15 23 42 / 0.3);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+[aria-label="Close preview"]::after {
+  content: "Close";
+}
+.compare-page > .mt-6.grid article > div:first-of-type {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 10rem !important;
+  min-height: 10rem !important;
+  overflow: hidden !important;
+  contain: layout paint;
+  padding: 0.75rem;
+  background: #f8fafc;
+}
+
+.compare-page > .mt-6.grid article > div:first-of-type > img {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  transform: none !important;
+}
+/* Show missing Add Service fields only after the user attempts to save. */
+.service-form.was-validated :is(input, select, textarea):invalid {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 1px #ef4444;
+}
+
+.service-form.was-validated label:has(:invalid) {
+  color: #b91c1c;
+}
+
+.service-form.was-validated div:has(> input[aria-hidden="true"]:invalid) > button:first-of-type {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 1px #ef4444;
+}
+
+.required-field-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 1px #ef4444;
+}
+
+/* Compact actions in the country picker dropdown. */
+.shadow-overlay > .flex.justify-end.border-t.bg-white {
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+}
+
+.shadow-overlay > .flex.justify-end.border-t.bg-white > button {
+  height: 1.75rem;
+  padding-inline: 0.625rem;
+  border-radius: 0.25rem;
+  font-size: 0.625rem;
+}
+@media print {
+  .compare-page .compare-pdf-action,
+  .compare-page button,
+  .compare-page select,
+  body:has(.compare-page) header,
+  body:has(.compare-page) footer,
+  body:has(.compare-page) aside {
+    display: none !important;
+  }
+
+  body:has(.compare-page) main {
+    margin: 0 !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .compare-page {
+    padding: 0 !important;
+  }
+
+  .compare-page table {
+    min-width: 0 !important;
+    font-size: 10px !important;
+  }
+}
+.brand-directory .brand-directory-card > span > img {
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-height: 2rem !important;
+  max-width: 85% !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+/* Compact cards in the full brand directory. */
+.brand-directory .brand-directory-card {
+  padding: 0.75rem !important;
+  border-radius: 0.5rem !important;
+}
+
+.brand-directory .brand-directory-card > span:first-child {
+  height: 3rem !important;
+  min-height: 0 !important;
+  overflow: hidden;
+  padding: 0.5rem !important;
+  border-radius: 0.625rem !important;
+  background: #f8fafc;
+}
+
+.brand-directory .brand-directory-card > h2 {
+  margin-top: 0.5rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1rem !important;
+}
+
+.brand-directory .brand-directory-card > p {
+  margin-top: 0.125rem !important;
+  font-size: 0.625rem !important;
+}
+
+/* Header brand menu logos keep their original navigation size. */
+.app-header a[href^='/marketplace/brands/'] > img {
+  width: 4.5rem !important;
+  height: 2.5rem !important;
+  max-width: 4.5rem !important;
+  max-height: 2.5rem !important;
+  flex: 0 0 4.5rem;
+  padding: 0.2rem !important;
+  object-fit: contain;
+}
+
+/* Public marketplace uses a separate header dropdown component. Give wide
+   wordmark logos enough horizontal room instead of shrinking them into 36px. */
+.marketplace-public-shell > header a[href^='/marketplace/brands/'] > span:first-child {
+  display: grid !important;
+  width: 4.5rem !important;
+  min-width: 4.5rem !important;
+  height: 2.5rem !important;
+  padding: 0.2rem !important;
+  place-items: center;
+  overflow: hidden;
+}
+
+.marketplace-public-shell > header a[href^='/marketplace/brands/'] > span:first-child > img {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  object-position: center;
+}

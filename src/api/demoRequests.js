@@ -7,7 +7,7 @@ async function request(url, options = {}) {
   return data
 }
 
-export const createDemoRequest = (payload) => request('/api/demo-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+export const createDemoRequest = (payload) => { const body = new FormData(); Object.entries(payload).forEach(([key, value]) => { if (value !== undefined && value !== null && value !== '') body.append(key, value) }); return request('/api/demo-requests', { method: 'POST', body }) }
 export const getDemoRequests = () => request('/api/demo-requests')
 export const updateDemoRequest = (id, status, rejectionReason = '') => request(`/api/demo-requests/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, ...(status === 'rejected' ? { rejection_reason: rejectionReason } : {}) }) })
 export const getDemoMessages = (id) => request(`/api/demo-requests/${id}/messages`)

@@ -1,4 +1,5 @@
 import { authHeaders } from '../auth/session'
+import { compressImage } from '../utils/compressImage'
 
 const API_URL = '/api/brands'
 let marketplaceBrandsPromise
@@ -19,7 +20,7 @@ async function request(url, options) {
 async function serialize(formData) {
   const payload = Object.fromEntries(formData.entries())
   const logo = formData.get('logo')
-  if (logo instanceof File && logo.size) payload.logo_data = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(logo) })
+  if (logo instanceof File && logo.size) payload.logo_data = await compressImage(logo, { maxWidth: 800, maxHeight: 800, quality: 0.88 })
   delete payload.logo
   return JSON.stringify(payload)
 }

@@ -1,0 +1,56 @@
+import { Boxes, Factory, ImageIcon, Search } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, Navigate, useParams } from 'react-router-dom'
+import { getMarketplaceIndustries } from '../api/industries'
+import { getMarketplaceServices } from '../api/marketplace'
+import { Skeleton } from '../components/ui'
+
+const slugify = (value) => String(value || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+const belongsToIndustry = (service, industry) => Boolean(industry) && (service.industries || []).some((item) => item.id === industry.id || item.name === industry.name)
+const uniqueProducts = (services, industry) => Object.values(services.filter((service) => belongsToIndustry(service, industry)).reduce((all, service) => {
+  const key = `${service.vendor_id}|${service.name}|${service.service_type}`
+  if (!all[key]) all[key] = { ...service, plans: [] }
+  all[key].plans.push(service)
+  return all
+}, {}))
+const uniqueRelated = (products, getter) => [...new Map(products.flatMap(getter).filter(Boolean).map((item) => [item.id || item.name, item])).values()]
+const DIRECTORY_PAGE_SIZE = 64
+
+export default function MarketplaceIndustriesPage() {
+  const { slug } = useParams()
+  const [industries, setIndustries] = useState([])
+  const [services, setServices] = useState([])
+  const [query, setQuery] = useState('')
+  const [type, setType] = useState('All')
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    getMarketplaceIndustries().then(setIndustries).catch((requestError) => setError(requestError.message)).finally(() => setLoading(false))
+    getMarketplaceServices().then(setServices).catch(() => {})
+  }, [])
+  useEffect(() => { setPage(1) }, [query])
+  const industry = industries.find((item) => item.slug === slug || slugify(item.name) === slug)
+  const counts = useMemo(() => new Map(industries.map((item) => [item.id, uniqueProducts(services, item).length])), [industries, services])
+
+  if (slug && loading) return <section className="pb-10"><Skeleton className="h-52 rounded-2xl"/><div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }, (_, index) => <Skeleton key={index} className="h-72 rounded-2xl"/>)}</div></section>
+  if (slug && !loading && !industry) return <Navigate to="/marketplace/industries" replace/>
+  if (!slug) {
+    const visible = industries.filter((item) => item.name.toLowerCase().includes(query.toLowerCase()))
+    const pageCount = Math.max(1, Math.ceil(visible.length / DIRECTORY_PAGE_SIZE))
+    const pageItems = visible.slice((page - 1) * DIRECTORY_PAGE_SIZE, page * DIRECTORY_PAGE_SIZE)
+    return <section className="industry-directory pb-10"><header className="rounded-2xl bg-gradient-to-r from-[#06285e] to-primary px-7 py-9 text-white"><p className="text-xs font-bold uppercase tracking-wider text-blue-100">Marketplace directory</p><h1 className="mt-2 text-3xl font-bold">Browse all industries</h1><p className="mt-2 text-sm text-blue-100">Find technology categories, brands and solutions built for your industry.</p></header><div className="relative mt-6"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search industries..." className="h-12 w-full rounded-xl border bg-white pl-11 pr-4 shadow-sm outline-none focus:border-primary"/></div>{error && <p className="mt-4 rounded-xl bg-red-50 p-4 text-red-700">{error}</p>}<div className="mt-4 flex items-center justify-between text-xs text-slate-500"><span>{visible.length.toLocaleString()} industries</span>{pageCount > 1 && <span>Page {page} of {pageCount}</span>}</div><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">{loading && Array.from({ length: 16 }, (_, index) => <Skeleton key={index} className="h-28"/>)}{pageItems.map((item) => <Link key={item.id} to={`/marketplace/industries/${item.slug || slugify(item.name)}`} className="industry-directory-card group min-w-0 overflow-hidden rounded-lg border bg-white p-3 shadow-subtle transition hover:border-blue-300 hover:shadow-md"><span className="grid h-12 place-items-center overflow-hidden rounded-md bg-slate-50 p-1.5">{item.logo_url ? <img src={item.logo_url} alt={item.name} loading="lazy" decoding="async" className="h-full max-h-8 w-full object-contain"/> : <Factory className="h-5 w-5 text-slate-300"/>}</span><h2 title={item.name} className="mt-2 truncate text-xs font-bold group-hover:text-primary">{item.name}</h2><p className="mt-0.5 truncate text-[10px] text-slate-500">{counts.get(item.id) || 0} products</p></Link>)}</div>{!loading && !pageItems.length && <p className="mt-6 rounded-xl border border-dashed bg-white p-10 text-center text-sm text-slate-500">No matching industries found.</p>}{pageCount > 1 && <nav aria-label="Industry directory pages" className="mt-6 flex items-center justify-center gap-2"><button type="button" disabled={page === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} className="h-9 rounded-lg border bg-white px-4 text-xs font-semibold disabled:opacity-40">Previous</button><span className="px-2 text-xs text-slate-500">{page} / {pageCount}</span><button type="button" disabled={page === pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))} className="h-9 rounded-lg border bg-white px-4 text-xs font-semibold disabled:opacity-40">Next</button></nav>}</section>
+  }
+
+  const products = uniqueProducts(services, industry)
+  const categories = uniqueRelated(products, (product) => [product.category])
+  const brands = uniqueRelated(products, (product) => [...(product.brands || []), product.brand])
+  const availableTypes = ['software', 'hardware', 'services'].filter((value) => products.some((product) => product.service_type === value))
+  const visibleProducts = products.filter((product) => (type === 'All' || product.service_type === type) && `${product.name} ${product.category?.name || ''}`.toLowerCase().includes(query.toLowerCase()))
+
+  return <section className="pb-10"><header className="rounded-2xl border bg-white p-6 shadow-subtle sm:p-8"><Link to="/marketplace/industries" className="text-xs font-semibold text-primary">← All industries</Link><div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-center"><span className="grid h-24 w-32 shrink-0 place-items-center rounded-2xl bg-slate-50 p-4">{industry.logo_url ? <img src={industry.logo_url} alt={industry.name} className="h-full w-full object-contain"/> : <Factory className="h-8 w-8 text-slate-300"/>}</span><div><p className="text-xs font-bold uppercase tracking-wider text-primary">Industry solutions</p><h1 className="mt-1 text-3xl font-bold">{industry.name}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{industry.description || `Explore verified categories, brands and technology solutions for ${industry.name}.`}</p></div></div></header>
+    <div className="mt-6 grid gap-5 lg:grid-cols-2"><section className="rounded-2xl border bg-white p-5 shadow-subtle"><h2 className="text-base font-bold">Categories for {industry.name}</h2><div className="mt-4 flex flex-wrap gap-2">{categories.map((item) => <span key={item.id || item.name} className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-2 text-xs font-semibold text-primary"><Boxes className="h-3.5 w-3.5"/>{item.name}</span>)}{!categories.length && <p className="text-sm text-slate-500">No categories are linked yet.</p>}</div></section><section className="rounded-2xl border bg-white p-5 shadow-subtle"><h2 className="text-base font-bold">Brands serving {industry.name}</h2><div className="mt-4 flex flex-wrap gap-2">{brands.map((item) => <Link key={item.id || item.name} to={`/marketplace/brands/${item.slug || slugify(item.name)}`} className="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-300 hover:text-primary">{item.logo_url ? <img src={item.logo_url} alt="" className="h-5 w-5 object-contain"/> : <ImageIcon className="h-4 w-4 text-slate-400"/>}{item.name}</Link>)}{!brands.length && <p className="text-sm text-slate-500">No brands are linked yet.</p>}</div></section></div>
+    <div className="mt-6 flex flex-wrap gap-2"><button onClick={() => setType('All')} className={`rounded-full px-4 py-2 text-xs font-semibold ${type === 'All' ? 'bg-primary text-white' : 'bg-white'}`}>All · {products.length}</button>{availableTypes.map((value) => <button key={value} onClick={() => setType(value)} className={`rounded-full px-4 py-2 text-xs font-semibold capitalize ${type === value ? 'bg-primary text-white' : 'bg-white'}`}>{value === 'services' ? 'Professional Services' : value} · {products.filter((product) => product.service_type === value).length}</button>)}</div><div className="relative mt-4"><Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${industry.name} products...`} className="h-11 w-full rounded-xl border bg-white pl-11 pr-4 outline-none"/></div><div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{visibleProducts.map((product) => <Link to={`/marketplace/services/${product.id}`} key={product.id} className="group overflow-hidden rounded-2xl border bg-white shadow-subtle transition hover:-translate-y-1 hover:shadow-floating"><div className="grid h-44 place-items-center bg-slate-50 p-4">{product.images?.[0]?.image_url ? <img src={product.images[0].image_url} alt={product.name} className="h-full w-full object-contain"/> : <Boxes className="h-10 w-10 text-slate-300"/>}</div><div className="p-5"><span className="text-xs font-semibold capitalize text-primary">{product.category?.name || product.service_type}</span><h2 className="mt-2 text-base font-bold group-hover:text-primary">{product.name}</h2><p className="mt-1 text-xs text-slate-500">by {product.vendor?.company_name || product.vendor?.name || 'Verified vendor'} · {product.plans.length} plans</p></div></Link>)}{!visibleProducts.length && <p className="col-span-full rounded-xl border border-dashed p-12 text-center text-sm text-slate-500">No matching products found.</p>}</div>
+  </section>
+}

@@ -4,15 +4,19 @@ import { AuthContext } from './auth-context'
 import { clearAuth, readAuth, saveAuth, saveCurrentUser } from './session'
 
 export function AuthProvider({ children }) {
-  const initial = readAuth()
+  const [initial] = useState(() => readAuth())
   const [user, setUser] = useState(initial.user)
   const [loading, setLoading] = useState(Boolean(initial.token))
 
   useEffect(() => {
     if (!initial.token) return
     getCurrentUser()
-      .then((response) => setUser(response.user))
-      .catch(() => { clearAuth(); setUser(null) })
+      .then((response) => { saveCurrentUser(response.user); setUser(response.user) })
+      .catch((error) => {
+        // Only an invalid/expired token should destroy a local session. A temporary
+        // server or network failure must not look like an intentional logout.
+        if (error.status === 401) { clearAuth(); setUser(null) }
+      })
       .finally(() => setLoading(false))
   }, [initial.token])
 
@@ -20,6 +24,7 @@ export function AuthProvider({ children }) {
     const response = await loginUser({ login, password })
     saveAuth(response.user, response.token, remember)
     setUser(response.user)
+    return response
   }, [])
 
   const register = useCallback(async (payload) => {
