@@ -1,7 +1,7 @@
-import { BriefcaseBusiness, Building2, ChevronDown, LogIn, Pencil, Plus, Trash2, UserRound, UsersRound } from 'lucide-react'
+import { BadgeCheck, BriefcaseBusiness, Building2, ChevronDown, LogIn, Pencil, Plus, Trash2, UserRound, UsersRound } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Swal from 'sweetalert2'
-import { createVendor, deleteVendor, getVendors, loginAsVendor, updateVendor } from '../api/vendors'
+import { approveVendor, createVendor, deleteVendor, getVendors, loginAsVendor, updateVendor } from '../api/vendors'
 import VendorModal from '../components/vendors/VendorModal'
 import { ActionMenu, TableSkeleton } from '../components/ui'
 import { useAuth } from '../auth/useAuth'
@@ -28,7 +28,7 @@ export default function VendorsPage() {
   const [saving, setSaving] = useState(false)
   const submitLock = useRef(false)
   const menuRef = useRef(null)
-  const { user } = useAuth()
+  const { user, can } = useAuth()
   const isVendor = user?.account_type === 'vendor'
 
   const load = useCallback(async () => {
@@ -118,6 +118,18 @@ export default function VendorsPage() {
     }
   }
 
+  const approve = async (vendor) => {
+    const confirmation = await Swal.fire({ icon: 'question', title: `Approve ${vendor.company_name || displayName(vendor)}?`, text: 'The vendor will be able to sign in and access their approved account.', showCancelButton: true, confirmButtonText: 'Approve Vendor', confirmButtonColor: '#059669' })
+    if (!confirmation.isConfirmed) return
+    try {
+      const response = await approveVendor(vendor.id)
+      setVendors((current) => current.map((item) => String(item.id) === String(vendor.id) ? response.data : item))
+      await Swal.fire({ icon: 'success', title: 'Vendor approved', text: 'The vendor account is now active.', confirmButtonColor: '#0B6FF4', timer: 1600, timerProgressBar: true })
+    } catch (requestError) {
+      await Swal.fire({ icon: 'error', title: 'Could not approve vendor', text: requestError.message, confirmButtonColor: '#0B6FF4' })
+    }
+  }
+
   const displayName = (vendor) => vendor.name || `${vendor.first_name || ''} ${vendor.last_name || ''}`.trim()
 
   return <section>
@@ -133,7 +145,7 @@ export default function VendorsPage() {
 
     <div className="mt-6 overflow-hidden rounded-lg border bg-white shadow-subtle">
       <div className="border-b px-4 py-4"><h2 className="text-sm font-bold">Registrations</h2><p className="mt-1 text-xs text-slate-500">{vendors.length} total</p></div>
-      {loading ? <TableSkeleton columns={7}/> : vendors.length === 0 ? <div className="grid min-h-60 place-items-center text-center"><div><span className="mx-auto grid h-11 w-11 place-items-center rounded-md bg-slate-100 text-slate-500"><UsersRound className="h-5 w-5"/></span><h3 className="mt-3 text-sm font-semibold">No registrations found</h3><p className="mt-1 text-xs text-slate-500">{isVendor ? 'No service profile is linked to this account.' : 'Use Add Vendor to create the first registration.'}</p></div></div> : <div className="overflow-x-auto"><table className="vendor-data-table w-full min-w-[720px] text-left xl:min-w-[920px] 2xl:min-w-[1180px]"><thead><tr className="border-b bg-slate-50 text-[11px] uppercase text-slate-500"><th className="px-4 py-3">Vendor</th><th className="px-4 py-3">Type</th><th className="hidden px-4 py-3 2xl:table-cell">Industry</th><th className="hidden px-4 py-3 2xl:table-cell">Category</th><th className="px-4 py-3">Email</th><th className="hidden px-4 py-3 xl:table-cell">Phone</th><th className="hidden px-4 py-3 xl:table-cell">City</th><th className="px-4 py-3">Status</th>{!isVendor && <th className="w-16 px-4 py-3 text-right">Actions</th>}</tr></thead><tbody>{vendors.map((vendor) => <tr key={vendor.id} className="border-b text-xs transition-colors hover:bg-slate-50/70 last:border-0"><td className="px-4 py-3"><div className="font-semibold text-slate-800">{vendor.company_name || displayName(vendor)}</div><div className="mt-0.5 text-[11px] text-slate-400">{displayName(vendor)}</div></td><td className="px-4 py-3"><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-primary">{typeLabels[vendor.registration_type]}</span></td><td className="hidden px-4 py-3 text-slate-500 2xl:table-cell">{vendor.industry?.name || '-'}</td><td className="hidden px-4 py-3 text-slate-500 2xl:table-cell">{vendor.service_category?.name || '-'}</td><td className="px-4 py-3 text-slate-500">{vendor.email}</td><td className="hidden px-4 py-3 text-slate-500 xl:table-cell">{vendor.phone}</td><td className="hidden px-4 py-3 text-slate-500 xl:table-cell">{vendor.city || '-'}</td><td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">{statusLabels[vendor.status] || vendor.status}</span></td>{!isVendor && <td className="px-4 py-3 text-right"><ActionMenu label={`Actions for ${vendor.company_name || displayName(vendor)}`} actions={[{ label: 'Login as vendor', icon: LogIn, onClick: () => impersonate(vendor), disabled: !vendor.user_id, title: vendor.user_id ? 'Login to this vendor account' : 'No login account is linked' }, { label: 'Edit vendor', icon: Pencil, onClick: () => edit(vendor) }, { label: 'Delete vendor', icon: Trash2, tone: 'danger', onClick: () => remove(vendor) }]}/></td>}</tr>)}</tbody></table></div>}
+      {loading ? <TableSkeleton columns={7}/> : vendors.length === 0 ? <div className="grid min-h-60 place-items-center text-center"><div><span className="mx-auto grid h-11 w-11 place-items-center rounded-md bg-slate-100 text-slate-500"><UsersRound className="h-5 w-5"/></span><h3 className="mt-3 text-sm font-semibold">No registrations found</h3><p className="mt-1 text-xs text-slate-500">{isVendor ? 'No service profile is linked to this account.' : 'Use Add Vendor to create the first registration.'}</p></div></div> : <div className="overflow-x-auto"><table className="vendor-data-table w-full min-w-[720px] text-left xl:min-w-[920px] 2xl:min-w-[1180px]"><thead><tr className="border-b bg-slate-50 text-[11px] uppercase text-slate-500"><th className="px-4 py-3">Vendor</th><th className="px-4 py-3">Type</th><th className="hidden px-4 py-3 2xl:table-cell">Industry</th><th className="hidden px-4 py-3 2xl:table-cell">Category</th><th className="px-4 py-3">Email</th><th className="hidden px-4 py-3 xl:table-cell">Phone</th><th className="hidden px-4 py-3 xl:table-cell">City</th><th className="px-4 py-3">Status</th>{!isVendor && <th className="w-16 px-4 py-3 text-right">Actions</th>}</tr></thead><tbody>{vendors.map((vendor) => <tr key={vendor.id} className="border-b text-xs transition-colors hover:bg-slate-50/70 last:border-0"><td className="px-4 py-3"><div className="font-semibold text-slate-800">{vendor.company_name || displayName(vendor)}</div><div className="mt-0.5 text-[11px] text-slate-400">{displayName(vendor)}</div></td><td className="px-4 py-3"><span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-primary">{typeLabels[vendor.registration_type]}</span></td><td className="hidden px-4 py-3 text-slate-500 2xl:table-cell">{vendor.industry?.name || '-'}</td><td className="hidden px-4 py-3 text-slate-500 2xl:table-cell">{vendor.service_category?.name || '-'}</td><td className="px-4 py-3 text-slate-500">{vendor.email}</td><td className="hidden px-4 py-3 text-slate-500 xl:table-cell">{vendor.phone}</td><td className="hidden px-4 py-3 text-slate-500 xl:table-cell">{vendor.city || '-'}</td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${vendor.status === 'approved' ? 'bg-emerald-50 text-emerald-700' : vendor.status === 'rejected' || vendor.status === 'suspended' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{statusLabels[vendor.status] || vendor.status}</span></td>{!isVendor && <td className="px-4 py-3 text-right"><ActionMenu label={`Actions for ${vendor.company_name || displayName(vendor)}`} actions={[vendor.status !== 'approved' && can('vendors.approve') ? { label: 'Approve vendor', icon: BadgeCheck, tone: 'success', onClick: () => approve(vendor) } : null, { label: 'Login as vendor', icon: LogIn, onClick: () => impersonate(vendor), disabled: !vendor.user_id || vendor.status !== 'approved', title: !vendor.user_id ? 'No login account is linked' : vendor.status !== 'approved' ? 'Approve this vendor before logging in' : 'Login to this vendor account' }, { label: 'Edit vendor', icon: Pencil, onClick: () => edit(vendor) }, { label: 'Delete vendor', icon: Trash2, tone: 'danger', onClick: () => remove(vendor) }]}/></td>}</tr>)}</tbody></table></div>}
     </div>
 
     <VendorModal open={modalOpen} registrationType={registrationType} vendor={editing} saving={saving} serverError={modalError} onClearError={() => setModalError('')} onClose={closeModal} onSave={save}/>

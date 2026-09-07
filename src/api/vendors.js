@@ -43,6 +43,10 @@ export function deleteVendor(id) {
   return request(`${API_URL}/${id}`, { method: 'DELETE' })
 }
 
+export function approveVendor(id) {
+  return request(`${API_URL}/${id}/approve`, { method: 'POST' })
+}
+
 export function loginAsVendor(id) {
   return request(`${API_URL}/${id}/impersonate`, { method: 'POST' })
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Vendor;
 use App\Models\User;
+use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -97,6 +98,21 @@ class VendorController extends Controller
 
         return response()->json([
             'message' => 'Registration deleted successfully.',
+        ]);
+    }
+
+    public function approve(Request $request, Vendor $vendor)
+    {
+        abort_if($request->user()->account_type === 'vendor', 403, 'Only administrators can approve vendors.');
+        $this->authorizeAssignedVendor($request, $vendor);
+
+        $before = ['status' => $vendor->status];
+        $vendor->update(['status' => 'approved']);
+        Audit::record($request, 'vendor.approved', $vendor, $before, ['status' => 'approved']);
+
+        return response()->json([
+            'message' => 'Vendor approved successfully.',
+            'data' => $this->resource($vendor->fresh()->load(['user:id', 'industry:id,name', 'serviceCategory:id,name'])),
         ]);
     }
 
