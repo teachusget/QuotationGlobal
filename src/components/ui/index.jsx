@@ -1,5 +1,6 @@
 import { LoaderCircle, MoreHorizontal, SearchX } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 const cx = (...values) => values.filter(Boolean).join(' ')
 
@@ -14,9 +15,62 @@ export function Button({ variant = 'primary', size = 'md', loading = false, icon
 export function IconButton({ label, variant = 'ghost', className = '', children, ...props }) { return <button aria-label={label} title={label} className={cx('grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-transparent text-slate-500 transition-all duration-180 hover:bg-slate-100 hover:text-slate-900 active:scale-95', variant === 'danger' && 'hover:bg-red-50 hover:text-red-600', className)} {...props}>{children}</button> }
 
 export function ActionMenu({ label = 'Open actions', actions = [], align = 'right' }) {
-  const [open, setOpen] = useState(false); const root = useRef(null)
-  useEffect(() => { if (!open) return undefined; const close = (event) => { if (event.key === 'Escape' || (event.type === 'mousedown' && !root.current?.contains(event.target))) setOpen(false) }; document.addEventListener('mousedown', close); document.addEventListener('keydown', close); return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close) } }, [open])
-  return <div ref={root} className="relative inline-flex"><IconButton label={label} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((current) => !current)}><MoreHorizontal className="h-4 w-4"/></IconButton>{open && <div role="menu" className={cx('absolute top-11 z-30 w-48 overflow-hidden rounded-xl border bg-white py-1 shadow-floating', align === 'right' ? 'right-0' : 'left-0')}>{actions.filter(Boolean).map(({ label: actionLabel, icon: Icon, tone, onClick, disabled, title }) => <button key={actionLabel} type="button" role="menuitem" disabled={disabled} title={title} onClick={() => { setOpen(false); onClick?.() }} className={cx('flex min-h-10 w-full items-center gap-2.5 px-3 py-2 text-left text-xs font-medium hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40', tone === 'danger' && 'text-red-600 hover:bg-red-50', tone === 'success' && 'text-emerald-700 hover:bg-emerald-50')}>{Icon && <Icon className="h-4 w-4 shrink-0"/>}{actionLabel}</button>)}</div>}</div>
+  const [open, setOpen] = useState(false)
+  const [position, setPosition] = useState({ left: 0, top: 0, ready: false })
+  const root = useRef(null)
+  const menu = useRef(null)
+  const menuId = useId()
+  const menuActions = actions.filter(Boolean)
+
+  const positionMenu = useCallback(() => {
+    const trigger = root.current?.getBoundingClientRect()
+    if (!trigger) return
+    const gutter = 8
+    const width = 192
+    const height = menu.current?.offsetHeight || (menuActions.length * 40 + 8)
+    const roomBelow = window.innerHeight - trigger.bottom
+    const opensUp = roomBelow < height + gutter && trigger.top > roomBelow
+    const preferredLeft = align === 'right' ? trigger.right - width : trigger.left
+    setPosition({
+      left: Math.min(Math.max(gutter, preferredLeft), window.innerWidth - width - gutter),
+      top: opensUp ? Math.max(gutter, trigger.top - height - gutter) : Math.min(trigger.bottom + gutter, window.innerHeight - height - gutter),
+      ready: true,
+    })
+  }, [align, menuActions.length])
+
+  useLayoutEffect(() => {
+    if (!open) return undefined
+    positionMenu()
+    const frame = requestAnimationFrame(positionMenu)
+    window.addEventListener('resize', positionMenu)
+    window.addEventListener('scroll', positionMenu, true)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('resize', positionMenu)
+      window.removeEventListener('scroll', positionMenu, true)
+    }
+  }, [open, positionMenu])
+
+  useEffect(() => {
+    if (!open) return undefined
+    const close = (event) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        root.current?.querySelector('button')?.focus()
+      }
+      if (event.type === 'mousedown' && !root.current?.contains(event.target) && !menu.current?.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', close)
+    }
+  }, [open])
+
+  const popup = open && createPortal(<div ref={menu} id={menuId} role="menu" aria-label={label} style={{ left: position.left, top: position.top, visibility: position.ready ? 'visible' : 'hidden' }} className="fixed z-[200] w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-overlay ring-1 ring-slate-950/5">{menuActions.map(({ label: actionLabel, icon: Icon, tone, onClick, disabled, title }) => <button key={actionLabel} type="button" role="menuitem" disabled={disabled} title={title} onClick={() => { setOpen(false); onClick?.() }} className={cx('flex min-h-10 w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950 focus:bg-blue-50 focus:text-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-40', tone === 'danger' && 'text-red-600 hover:bg-red-50 hover:text-red-700 focus:bg-red-50 focus:text-red-700', tone === 'success' && 'text-emerald-700 hover:bg-emerald-50 focus:bg-emerald-50')}>{Icon && <Icon className="h-4 w-4 shrink-0"/>}<span>{actionLabel}</span></button>)}</div>, document.body)
+
+  return <><div ref={root} className="inline-flex"><IconButton label={label} aria-controls={open ? menuId : undefined} aria-expanded={open} aria-haspopup="menu" onClick={() => { setPosition((current) => ({ ...current, ready: false })); setOpen((current) => !current) }} className={open ? 'bg-blue-50 text-primary ring-2 ring-primary/20' : ''}><MoreHorizontal className="h-4 w-4"/></IconButton></div>{popup}</>
 }
 
 export function PageHeader({ eyebrow, title, description, icon: Icon, actions, stats, className = '' }) { return <header className={cx('ui-page-header', className)}><div className="min-w-0"><div className="ui-eyebrow">{Icon && <Icon className="h-4 w-4"/>}{eyebrow}</div><h1 className="ui-page-title">{title}</h1>{description && <p className="ui-page-description">{description}</p>}</div>{(stats || actions) && <div className="flex shrink-0 flex-wrap items-center gap-3">{stats}{actions}</div>}</header> }
