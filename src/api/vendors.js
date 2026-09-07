@@ -47,6 +47,14 @@ export function approveVendor(id) {
   return request(`${API_URL}/${id}/approve`, { method: 'POST' })
 }
 
+export function setVendorActive(id, active) {
+  return request(`${API_URL}/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active }),
+  })
+}
+
 export function loginAsVendor(id) {
   return request(`${API_URL}/${id}/impersonate`, { method: 'POST' })
 }

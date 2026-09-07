@@ -116,7 +116,12 @@ class AuthController extends Controller
         }
         if ($user->is_blocked) throw ValidationException::withMessages(['login' => ['Your account has been blocked. Please contact support.']]);
         if (in_array($user->account_type, ['buyer', 'vendor'], true) && ! $user->email_verified_at) throw ValidationException::withMessages(['login' => ['Verify your email before signing in.']]);
-        if ($user->account_type === 'vendor' && $user->vendorProfile && $user->vendorProfile->status !== 'approved') throw ValidationException::withMessages(['login' => ['Your Solution Provider application is awaiting administrator approval.']]);
+        if ($user->account_type === 'vendor' && $user->vendorProfile && $user->vendorProfile->status !== 'approved') {
+            $message = $user->vendorProfile->status === 'suspended'
+                ? 'Your Solution Provider account is inactive. Please contact support.'
+                : 'Your Solution Provider application is awaiting administrator approval.';
+            throw ValidationException::withMessages(['login' => [$message]]);
+        }
 
         $user->update(['last_login_at' => now()]);
 
@@ -142,6 +147,7 @@ class AuthController extends Controller
         if (! $request->user()->isSuperAdmin()) {
             abort_unless($request->user()->assignedVendors()->whereKey($vendor->id)->exists(), 403, 'This vendor is not assigned to you.');
         }
+        abort_unless($vendor->status === 'approved', 422, 'Activate this vendor before logging in.');
         $vendorUser = $vendor->user;
         abort_unless($vendorUser && $vendorUser->account_type === 'vendor', 422, 'This vendor does not have a linked login account.');
 

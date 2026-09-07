@@ -116,6 +116,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('vendors', [VendorController::class, 'store'])->middleware('permission:vendors.create');
     Route::put('vendors/{vendor}', [VendorController::class, 'update'])->middleware('permission:vendors.update');
     Route::post('vendors/{vendor}/approve', [VendorController::class, 'approve'])->middleware('permission:vendors.approve');
+    Route::patch('vendors/{vendor}/status', [VendorController::class, 'status'])->middleware('permission:vendors.activate|vendors.deactivate');
     Route::delete('vendors/{vendor}', [VendorController::class, 'destroy'])->middleware('permission:vendors.delete');
     Route::post('vendors/{vendor}/impersonate', [AuthController::class, 'impersonateVendor'])->middleware('permission:vendors.impersonate');
     Route::get('services', [ServiceController::class, 'index'])->middleware('permission:services.view');

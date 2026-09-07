@@ -116,6 +116,37 @@ class VendorController extends Controller
         ]);
     }
 
+    public function status(Request $request, Vendor $vendor)
+    {
+        abort_if($request->user()->account_type === 'vendor', 403, 'Only administrators can change vendor access.');
+        $data = $request->validate(['active' => ['required', 'boolean']]);
+        $permission = $data['active'] ? 'vendors.activate' : 'vendors.deactivate';
+        abort_unless($request->user()->can($permission), 403);
+        $this->authorizeAssignedVendor($request, $vendor);
+
+        $status = $data['active'] ? 'approved' : 'suspended';
+        $before = ['status' => $vendor->status];
+
+        DB::transaction(function () use ($request, $vendor, $before, $status, $data) {
+            $vendor->update(['status' => $status]);
+            if (! $data['active']) {
+                $vendor->user?->tokens()->delete();
+            }
+            Audit::record(
+                $request,
+                $data['active'] ? 'vendor.activated' : 'vendor.deactivated',
+                $vendor,
+                $before,
+                ['status' => $status]
+            );
+        });
+
+        return response()->json([
+            'message' => $data['active'] ? 'Vendor activated successfully.' : 'Vendor deactivated successfully.',
+            'data' => $this->resource($vendor->fresh()->load(['user:id', 'industry:id,name', 'serviceCategory:id,name'])),
+        ]);
+    }
+
     public function document(Vendor $vendor)
     {
         abort_unless(
