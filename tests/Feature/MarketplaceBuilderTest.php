@@ -73,6 +73,68 @@ class MarketplaceBuilderTest extends TestCase
             ->assertJsonPath('data.catalog.services.0.id', $serviceId);
     }
 
+    public function test_centre_and_footer_advertisements_are_published_with_their_solutions(): void
+    {
+        $this->superAdmin();
+        $category = Category::create(['name' => 'Ads', 'slug' => 'advertisement-solutions']);
+        $subcategory = Category::create(['parent_id' => $category->id, 'name' => 'Promoted', 'slug' => 'promoted-solutions']);
+        $industry = Industry::create(['name' => 'Advertising', 'slug' => 'advertising']);
+        $vendor = Vendor::create(['registration_type' => 'company', 'phone' => '+1 555 0199', 'email' => 'ads@example.com', 'company_name' => 'Ads Vendor']);
+        $centre = Service::create(['vendor_id' => $vendor->id, 'category_id' => $category->id, 'subcategory_id' => $subcategory->id, 'industry_id' => $industry->id, 'name' => 'Centre Solution', 'service_type' => 'software']);
+        $footer = Service::create(['vendor_id' => $vendor->id, 'category_id' => $category->id, 'subcategory_id' => $subcategory->id, 'industry_id' => $industry->id, 'name' => 'Footer Solution', 'service_type' => 'services']);
+
+        $document = MarketplacePage::where('slug', 'home')->firstOrFail()->draft_document;
+        $document['advertisements'] = [
+            'center' => [['service_id' => $centre->id, 'duration_seconds' => 8]],
+            'footer' => [['service_id' => $footer->id, 'duration_seconds' => 12]],
+        ];
+        $document['advertisements_visibility'] = ['banner' => false, 'catalog' => true, 'footer' => false];
+
+        $this->putJson('/api/marketplace-builder/draft', $this->draftPayload($document))->assertOk();
+        $this->postJson('/api/marketplace-builder/publish', ['name' => 'Advertisement placements'])->assertOk();
+        $this->getJson('/api/marketplace/page')
+            ->assertOk()
+            ->assertJsonPath('data.document.advertisements.center.0.service_id', $centre->id)
+            ->assertJsonPath('data.document.advertisements.footer.0.service_id', $footer->id)
+            ->assertJsonPath('data.document.advertisements_visibility.banner', false)
+            ->assertJsonPath('data.document.advertisements_visibility.catalog', true)
+            ->assertJsonPath('data.document.advertisements_visibility.footer', false)
+            ->assertJsonFragment(['name' => 'Centre Solution'])
+            ->assertJsonFragment(['name' => 'Footer Solution']);
+    }
+
+    public function test_builder_rejects_malformed_advertisement_placements(): void
+    {
+        $this->superAdmin();
+        $document = MarketplacePage::where('slug', 'home')->firstOrFail()->draft_document;
+        $document['advertisements'] = ['center' => ['invalid'], 'footer' => []];
+
+        $this->putJson('/api/marketplace-builder/draft', $this->draftPayload($document))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('document.advertisements.center.0');
+    }
+
+    public function test_builder_rejects_non_boolean_advertisement_visibility(): void
+    {
+        $this->superAdmin();
+        $document = MarketplacePage::where('slug', 'home')->firstOrFail()->draft_document;
+        $document['advertisements_visibility'] = ['banner' => 'yes', 'catalog' => true, 'footer' => false];
+
+        $this->putJson('/api/marketplace-builder/draft', $this->draftPayload($document))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('document.advertisements_visibility.banner');
+    }
+
+    public function test_super_admin_has_full_advertisement_management_permissions(): void
+    {
+        $admin = $this->superAdmin();
+
+        $this->assertTrue($admin->can('marketplace_builder.view'));
+        $this->assertTrue($admin->can('marketplace_builder.update'));
+        $this->assertTrue($admin->can('marketplace_builder.publish'));
+        $this->getJson('/api/marketplace-builder')->assertOk();
+    }
+
     public function test_builder_rejects_unsafe_links(): void
     {
         $this->superAdmin();

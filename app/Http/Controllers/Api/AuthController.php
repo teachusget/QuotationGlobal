@@ -17,6 +17,42 @@ use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
+    public function registerVendor(Request $request)
+    {
+        $data = $request->validate([
+            'registration_type' => ['required', Rule::in(['freelancer', 'agency', 'company'])],
+            'name' => ['required', 'string', 'max:150'],
+            'first_name' => ['nullable', 'string', 'max:75'],
+            'last_name' => ['nullable', 'string', 'max:75'],
+            'password' => ['required', 'string', 'min:8', 'max:100', 'confirmed'],
+            'phone' => ['required', 'string', 'max:30'],
+            'email' => ['required', 'email:rfc,dns', 'max:150', 'unique:users,email', 'unique:vendors,email'],
+            'country' => ['required', 'string', 'max:100'],
+            'address' => ['nullable', 'string', 'max:1000'],
+            'city' => ['required', 'string', 'max:100'],
+            'company_name' => ['required', 'string', 'max:150'],
+            'designation' => ['nullable', 'string', 'max:100'],
+            'business_type' => ['nullable', 'string', 'max:100'],
+        ]);
+        $code = (string) random_int(100000, 999999);
+        DB::transaction(function () use ($data, $code) {
+            $user = User::create([
+                'name' => trim($data['name']), 'email' => trim($data['email']), 'phone' => trim($data['phone']),
+                'company_name' => trim($data['company_name']), 'address' => trim($data['address'] ?? ''),
+                'city' => trim($data['city']), 'country' => trim($data['country']), 'password' => $data['password'],
+                'account_type' => 'vendor', 'email_verification_code' => Hash::make($code),
+                'email_verification_expires_at' => now()->addMinutes(10),
+            ]);
+            $user->syncRoles(['Vendor']);
+            Vendor::create([
+                ...collect($data)->except(['password_confirmation'])->all(), 'user_id' => $user->id,
+                'password' => Hash::make($data['password']), 'status' => 'pending_approval',
+            ]);
+        });
+        Mail::raw("Your Quotation Global Solution Provider verification code is: {$code}\n\nThis code expires in 10 minutes.", fn ($mail) => $mail->to($data['email'], $data['name'])->subject('Verify your Solution Provider application'));
+        return response()->json(['message' => 'Application received. Verify your email to submit it for approval.', 'email' => $data['email'], 'requires_verification' => true, 'verification_code' => app()->isLocal() ? $code : null], 201);
+    }
+
     public function register(Request $request)
     {
         $data = $request->validate([
@@ -51,11 +87,14 @@ class AuthController extends Controller
     public function verifyEmail(Request $request)
     {
         $data = $request->validate(['email' => ['required', 'email'], 'code' => ['required', 'digits:6']]);
-        $user = User::where('email', $data['email'])->where('account_type', 'buyer')->firstOrFail();
+        $user = User::where('email', $data['email'])->firstOrFail();
         if (! $user->email_verification_code || ! $user->email_verification_expires_at || $user->email_verification_expires_at->isPast() || ! Hash::check($data['code'], $user->email_verification_code)) {
             throw ValidationException::withMessages(['code' => ['The verification code is invalid or expired.']]);
         }
         $user->update(['email_verified_at' => now(), 'email_verification_code' => null, 'email_verification_expires_at' => null, 'last_login_at' => now()]);
+        if ($user->account_type === 'vendor') {
+            return response()->json(['message' => 'Email verified. Your application is now pending administrator approval.', 'pending_approval' => true]);
+        }
         return response()->json($this->authenticationResponse($user));
     }
 
@@ -76,7 +115,8 @@ class AuthController extends Controller
             ]);
         }
         if ($user->is_blocked) throw ValidationException::withMessages(['login' => ['Your account has been blocked. Please contact support.']]);
-        if ($user->account_type === 'buyer' && ! $user->email_verified_at) throw ValidationException::withMessages(['login' => ['Verify your email before signing in.']]);
+        if (in_array($user->account_type, ['buyer', 'vendor'], true) && ! $user->email_verified_at) throw ValidationException::withMessages(['login' => ['Verify your email before signing in.']]);
+        if ($user->account_type === 'vendor' && $user->vendorProfile && $user->vendorProfile->status !== 'approved') throw ValidationException::withMessages(['login' => ['Your Solution Provider application is awaiting administrator approval.']]);
 
         $user->update(['last_login_at' => now()]);
 

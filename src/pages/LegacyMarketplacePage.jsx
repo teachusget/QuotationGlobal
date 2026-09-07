@@ -1,5 +1,5 @@
 import { ArrowRight, BadgeCheck, Boxes, CalendarDays, FileText, GitCompareArrows, Globe2, Headphones, Search, ShieldCheck, Sparkles, Tag, UsersRound, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { getMarketplaceBrands } from '../api/brands'
 import { getMarketplaceCategories } from '../api/categories'
@@ -49,7 +49,11 @@ export default function LegacyMarketplacePage() {
   const [companySize, setCompanySize] = useState(() => marketplaceParam('company_size'))
   const [budget, setBudget] = useState(() => marketplaceParam('budget'))
   const [sellingCountry, setSellingCountry] = useState(() => localStorage.getItem('marketplace-selling-country') || 'Global')
-  const [featuredAds, setFeaturedAds] = useState(null)
+  const [featuredAds, setFeaturedAds] = useState(undefined)
+  const [adCatalogServices, setAdCatalogServices] = useState([])
+  const [advertisementsLoading, setAdvertisementsLoading] = useState(true)
+  const [adPlacements, setAdPlacements] = useState({ center: [], footer: [] })
+  const [adVisibility, setAdVisibility] = useState({ banner: true, catalog: true, footer: true })
   const [themePreset, setThemePreset] = useState('neon-nexus')
   const [compareIds, setCompareIds] = useState(() => { try { return JSON.parse(localStorage.getItem('compare-services') || '[]').slice(0, 3) } catch { return [] } })
   const [compareNotice, setCompareNotice] = useState('')
@@ -65,7 +69,7 @@ export default function LegacyMarketplacePage() {
       .finally(() => setLoading(false))
     getMarketplaceBrands().then(setBrands).catch(() => setBrands([]))
     getMarketplaceCategories().then(setCategories).catch(() => setCategories([])).finally(() => setCategoriesLoading(false))
-    getPublishedMarketplacePage().then((result) => { const hero = result.data?.document?.sections?.find((block) => block.type === 'hero'); setFeaturedAds(Array.isArray(hero?.settings?.featured_ads) ? hero.settings.featured_ads : null); setThemePreset(result.data?.document?.theme?.preset || 'neon-nexus') }).catch(() => setFeaturedAds(null))
+    getPublishedMarketplacePage().then((result) => { const document = result.data?.document; const hero = document?.sections?.find((block) => block.type === 'hero'); setFeaturedAds(Array.isArray(hero?.settings?.featured_ads) ? hero.settings.featured_ads : []); setAdCatalogServices(result.data?.catalog?.services || []); setAdPlacements({ center: document?.advertisements?.center || [], footer: document?.advertisements?.footer || [] }); setAdVisibility({ banner: document?.advertisements_visibility?.banner !== false, catalog: document?.advertisements_visibility?.catalog !== false, footer: document?.advertisements_visibility?.footer !== false }); setThemePreset(document?.theme?.preset || 'neon-nexus') }).catch(() => { setFeaturedAds(null); setAdCatalogServices([]); setAdPlacements({ center: [], footer: [] }); setAdVisibility({ banner: true, catalog: true, footer: true }) }).finally(() => setAdvertisementsLoading(false))
   }, [])
 
   useEffect(() => {
@@ -96,6 +100,8 @@ export default function LegacyMarketplacePage() {
     return all
   }, {})), [services])
   const countryEligible = sellingCountry === 'Global' ? grouped : grouped.filter((service) => service.sell_globally && (service.selling_countries || []).includes(sellingCountry))
+  const carouselServices = useMemo(() => [...new Map([...countryEligible, ...adCatalogServices].map((service) => [Number(service.id), service])).values()], [countryEligible, adCatalogServices])
+  const bannerAds = Array.isArray(featuredAds) ? featuredAds : countryEligible.slice(0, 5).map((service) => ({ service_id: service.id, duration_seconds: 6 }))
   const advancedOptions = useMemo(() => {
     const industries = [...new Set(grouped.flatMap((service) => (service.industries || []).map((item) => item.name)))].sort()
     const deployments = [...new Set(grouped.flatMap((service) => specificationValues(service, /deployment|hosting/i)))].sort()
@@ -128,7 +134,7 @@ export default function LegacyMarketplacePage() {
   return <section className={`marketplace-page-${themePreset} pb-7`}>
     <div className={`legacy-marketplace-hero marketplace-theme-${themePreset} overflow-hidden rounded-2xl px-5 pb-5 pt-6 text-white sm:px-8 lg:px-12 lg:pt-7`}>
       <div className="hero-discovery flex flex-wrap items-center gap-2"><span className="mr-2 inline-flex items-center gap-1.5 rounded-full border border-indigo-400/50 bg-indigo-500/20 px-4 py-2 text-xs font-bold shadow-[0_0_24px_rgba(99,102,241,.28)]"><Sparkles className="h-3.5 w-3.5"/>Smart Discovery</span>{[['Software & SaaS', 'software'], ['Hardware solutions', 'hardware'], ['Professional services', 'services']].map(([label, value]) => <Link to={`/marketplace/type/${value}`} key={value} className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium text-blue-100 transition hover:bg-white/10 hover:text-white">{label}<ArrowRight className="h-3.5 w-3.5"/></Link>)}</div>
-      <div className="relative mt-9 grid items-center gap-10 lg:grid-cols-[1.08fr_.92fr] lg:gap-14">
+      <div className={`relative mt-9 grid items-center gap-10 ${adVisibility.banner && (advertisementsLoading || bannerAds.length > 0) ? 'lg:grid-cols-[1.08fr_.92fr] lg:gap-14' : ''}`}>
         <div className="relative z-10">
           <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-blue-100"><Tag className="h-3.5 w-3.5"/>Technology marketplace</span>
           <h1 className="mt-5 max-w-2xl text-4xl font-extrabold leading-[1.12] sm:text-5xl">Find the right<br/>technology solution<br/>for <span className="hero-gradient-text">your business.</span></h1>
@@ -136,7 +142,7 @@ export default function LegacyMarketplacePage() {
           <div className="mt-6 grid max-w-lg grid-cols-3 gap-3">{[[BadgeCheck, 'Verified', 'vendors'], [Headphones, 'Demo', 'support'], [Tag, 'Transparent', 'pricing']].map(([Icon, top, bottom]) => <div key={top} className="flex items-center gap-2.5 text-xs text-blue-100"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/10"><Icon className="h-4 w-4"/></span><span>{top}<br/>{bottom}</span></div>)}</div>
           <div className="mt-7 flex flex-wrap gap-3"><a href="#marketplace-products" className="inline-flex h-11 items-center gap-3 rounded-full bg-gradient-to-r from-blue-500 to-violet-600 px-6 text-xs font-bold text-white shadow-[0_12px_30px_rgba(76,29,149,.35)]">Explore Solutions<ArrowRight className="h-4 w-4"/></a><a href="#marketplace-products" className="inline-flex h-11 items-center gap-3 rounded-full border border-white/30 bg-white/5 px-6 text-xs font-semibold text-white backdrop-blur"><CalendarDays className="h-4 w-4"/>Request a Demo</a></div>
         </div>
-        <div className="hero-ad-stage relative hidden min-h-[390px] items-center lg:flex"><span className="hero-neon-cube hero-neon-cube-one"/><span className="hero-neon-cube hero-neon-cube-two"/><span className="hero-neon-orb"/><FeaturedAdsCarousel ads={featuredAds ?? countryEligible.slice(0, 5).map((service) => ({ service_id: service.id, duration_seconds: 6 }))} services={countryEligible}/></div>
+        {adVisibility.banner && (advertisementsLoading || bannerAds.length > 0) && <div className="hero-ad-stage relative hidden min-h-[390px] items-center lg:flex"><span className="hero-neon-cube hero-neon-cube-one"/><span className="hero-neon-cube hero-neon-cube-two"/><span className="hero-neon-orb"/>{advertisementsLoading ? <div aria-label="Loading featured advertisement" className="mx-auto h-72 w-full max-w-md animate-pulse rounded-3xl border border-white/20 bg-white/10"/> : <FeaturedAdsCarousel ads={bannerAds} services={carouselServices}/>}</div>}
       </div>
       <div className="hero-stats mt-9 grid overflow-hidden rounded-2xl border border-white/15 bg-white/10 backdrop-blur-xl sm:grid-cols-2 lg:grid-cols-4">{[[Boxes, `${grouped.length || 0}+`, 'Solutions', 'blue'], [UsersRound, `${brands.length || 0}+`, 'Verified Vendors', 'emerald'], [FileText, `${categories.length || 0}+`, 'Categories', 'amber'], [Globe2, 'Global', 'Worldwide Reach', 'violet']].map(([Icon, value, label, tone]) => <div key={label} className="flex items-center gap-4 border-white/15 px-6 py-4 lg:border-r lg:last:border-r-0"><span className={`hero-stat-icon hero-stat-${tone}`}><Icon className="h-5 w-5"/></span><span><b className="block text-lg">{value}</b><small className="text-xs text-blue-100/75">{label}</small></span></div>)}</div>
     </div>
@@ -149,7 +155,7 @@ export default function LegacyMarketplacePage() {
       {error && <p role="alert" className="mt-5 text-sm text-red-600">{error}</p>}
       <div className="mt-6 grid items-stretch gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {loading && Array.from({ length: 6 }, (_, index) => <div key={index} className="overflow-hidden rounded-xl border"><Skeleton className="h-48 rounded-none"/><div className="p-5"><Skeleton className="h-3 w-20"/><Skeleton className="mt-4 h-5 w-4/5"/><Skeleton className="mt-7 h-9 w-32"/></div></div>)}
-        {visible.map((service) => <MarketplaceProductCard key={service.id} service={service} selected={compareIds.map(String).includes(String(service.id))} disabled={compareIds.length >= 3} onCompare={toggleCompare}/>)}
+        {visible.map((service, index) => <Fragment key={service.id}><MarketplaceProductCard service={service} selected={compareIds.map(String).includes(String(service.id))} disabled={compareIds.length >= 3} onCompare={toggleCompare}/>{index === Math.min(2, visible.length - 1) && adVisibility.catalog && adPlacements.center.length > 0 && <div className="col-span-full my-2 rounded-3xl bg-gradient-to-r from-[#06285e] to-primary p-4 sm:p-6"><p className="mb-3 text-[10px] font-bold uppercase tracking-[.18em] text-blue-100">Sponsored solution</p><FeaturedAdsCarousel placement="center" ads={adPlacements.center} services={countryEligible}/></div>}</Fragment>)}
         {!loading && !visible.length && <div className="col-span-full grid min-h-48 place-items-center rounded-xl border border-dashed text-center"><div><Search className="mx-auto h-7 w-7 text-slate-300"/><p className="mt-3 text-sm font-semibold">No solutions found</p><button onClick={clearFilters} className="mt-2 text-xs font-semibold text-primary">Clear filters</button></div></div>}
       </div>
     </div>
@@ -158,5 +164,6 @@ export default function LegacyMarketplacePage() {
     {compareProducts.length > 0 && <aside aria-label="Selected products for comparison" className="fixed bottom-4 left-1/2 z-[60] w-[min(900px,calc(100vw-24px))] -translate-x-1/2 rounded-2xl border border-blue-200 bg-white/95 p-3 shadow-overlay backdrop-blur"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="flex items-center gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-primary"><GitCompareArrows className="h-5 w-5"/></span><div><b className="block text-sm text-slate-900">Compare solutions</b><span className="text-[11px] text-slate-500">{compareProducts.length}/3 selected · minimum 2 required</span></div></div><div className="flex min-w-0 flex-1 gap-2 overflow-x-auto sm:justify-center">{compareProducts.map((product) => <span key={product.id} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700"><span className="max-w-32 truncate">{product.name}</span><button type="button" onClick={() => toggleCompare(product)} aria-label={`Remove ${product.name}`} className="text-slate-400 hover:text-red-600"><X className="h-3.5 w-3.5"/></button></span>)}</div><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={clearCompare} className="h-10 rounded-lg px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100">Clear</button><Link to="/compare" aria-disabled={compareProducts.length < 2} onClick={(event) => { if (compareProducts.length < 2) event.preventDefault() }} className={`inline-flex h-10 items-center gap-2 rounded-lg px-5 text-xs font-bold text-white ${compareProducts.length >= 2 ? 'bg-primary hover:bg-blue-700' : 'cursor-not-allowed bg-slate-300'}`}>Compare now<ArrowRight className="h-4 w-4"/></Link></div></div></aside>}
 
     <div className="mt-10 grid gap-4 md:grid-cols-3">{[[BadgeCheck, 'Verified vendors', 'Discover services from registered vendors and trusted partners.'], [Headphones, 'Book a demo', 'Choose a convenient time and send your request directly to the Solution Provider.'], [ShieldCheck, 'Clear pricing', 'See available billing plans, pricing and discounts before you decide.']].map(([Icon, title, detail]) => <div key={title} className="rounded-xl border bg-white p-5"><span className="grid h-10 w-10 place-items-center rounded-lg bg-blue-50 text-primary"><Icon className="h-5 w-5"/></span><h3 className="mt-4 text-sm font-bold">{title}</h3><p className="mt-1 text-xs leading-5 text-slate-500">{detail}</p></div>)}</div>
+    {adVisibility.footer && adPlacements.footer.length > 0 && <aside aria-label="Sponsored marketplace solutions" className="mt-10 rounded-3xl bg-gradient-to-r from-slate-950 via-[#082d66] to-primary p-4 sm:p-7"><div className="mb-4 flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-blue-200">Advertisement</p><h2 className="mt-1 text-lg font-bold text-white">Featured partner solution</h2></div><span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold text-blue-100">Sponsored</span></div><FeaturedAdsCarousel placement="footer" ads={adPlacements.footer} services={countryEligible}/></aside>}
   </section>
 }

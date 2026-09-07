@@ -175,6 +175,7 @@ class MarketplaceBuilderController extends Controller
             }
         };
         $walk($document['sections'] ?? []);
+        foreach (['center', 'footer'] as $placement) $wanted['services'] = array_values(array_unique([...$wanted['services'], ...array_map('intval', array_column(data_get($document, "advertisements.$placement", []), 'service_id'))]));
         $simple = fn ($query, string $kind) => $query->get()->map(fn ($row) => ['id' => $row->id, 'name' => $row->name, 'logo_url' => $row->logo_data ? url("/api/$kind/{$row->id}/logo") : null])->values();
         $services = Service::whereIn('id', $wanted['services'])->with(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'brand:id,name', 'brands:id,name', 'industries:id,name', 'images' => fn ($query) => $query->select('id', 'service_id', 'sort_order')->orderBy('sort_order')->limit(1)])->get()->map(function ($row) {
             return ['id' => $row->id, 'name' => $row->name, 'service_type' => $row->service_type, 'price_from' => $row->price_from, 'vendor' => $row->vendor, 'category' => $row->category, 'subcategory' => $row->subcategory, 'brand' => $row->brand, 'brands' => $row->brands, 'industries' => $row->industries, 'images' => $row->images->map(fn ($image) => ['id' => $image->id, 'image_url' => url('/api/marketplace/service-images/'.$image->id)]), 'plans' => [['price_from' => $row->price_from]]];

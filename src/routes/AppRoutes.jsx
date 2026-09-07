@@ -19,6 +19,7 @@ const BrandsPage = lazy(() => import('../pages/BrandsPage'))
 const IndustriesPage = lazy(() => import('../pages/IndustriesPage'))
 const VendorsPage = lazy(() => import('../pages/VendorsPage'))
 const RegisterPage = lazy(() => import('../pages/RegisterPage'))
+const SolutionProviderRegisterPage = lazy(() => import('../pages/SolutionProviderRegisterPage'))
 const ForgotPasswordPage = lazy(() => import('../pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('../pages/ResetPasswordPage'))
 const ProductPage = lazy(() => import('../pages/ProductPage'))
@@ -60,6 +61,7 @@ export default function AppRoutes() {
   return <Suspense fallback={<div className="mx-auto min-h-96 w-full max-w-[1440px] animate-pulse rounded-xl bg-slate-100"/>}><Routes>
     <Route path="/login" element={<LoginPage/>}/>
     <Route path="/register" element={<RegisterPage/>}/>
+    <Route path="/solution-provider/register" element={<SolutionProviderRegisterPage/>}/>
     <Route path="/forgot-password" element={<ForgotPasswordPage/>}/>
     <Route path="/reset-password/:token" element={<ResetPasswordPage/>}/>
     <Route element={<PublicMarketplaceLayout/>}>

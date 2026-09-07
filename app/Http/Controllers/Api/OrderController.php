@@ -48,6 +48,7 @@ class OrderController extends Controller
             $productPlans = Service::where('vendor_id', $service->vendor_id)->where('name', $service->name)->where('service_type', $service->service_type)->lockForUpdate()->get();
             $inventoryProduct = $productPlans->sortBy('id')->first();
             abort_unless($service->service_type === 'hardware', 422, 'Direct ordering is only available for hardware.');
+            abort_unless($service->pricing_mode === 'starting_price', 422, 'Flexible-price hardware requires a quote before ordering.');
             abort_unless($service->sku, 422, 'This hardware product does not have an SKU.');
             if ($inventoryProduct->track_inventory) abort_if($inventoryProduct->inventory_quantity < $data['quantity'], 422, 'Only '.$inventoryProduct->inventory_quantity.' item(s) are currently available.');
             $price = (float) $service->price_from;

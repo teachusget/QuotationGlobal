@@ -1,0 +1,26 @@
+import { BriefcaseBusiness, Building2, CheckCircle2, Mail, UserRound } from 'lucide-react'
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import BrandLogo from '../components/common/BrandLogo'
+import VendorModal from '../components/vendors/VendorModal'
+import { registerVendor, verifyEmailCode } from '../api/auth'
+
+const options = [
+  { type: 'freelancer', label: 'For Freelancer', description: 'Register as an individual solution provider.', icon: UserRound },
+  { type: 'agency', label: 'As an Agency', description: 'Register your professional agency.', icon: BriefcaseBusiness },
+  { type: 'company', label: 'As a Company', description: 'Register your company as a solution provider.', icon: Building2 },
+]
+
+export default function SolutionProviderRegisterPage() {
+  const [type, setType] = useState('freelancer'); const [open, setOpen] = useState(false); const [saving, setSaving] = useState(false); const [error, setError] = useState('')
+  const [email, setEmail] = useState(''); const [code, setCode] = useState(''); const [localCode, setLocalCode] = useState(''); const [complete, setComplete] = useState(false)
+  const select = (selectedType) => { setType(selectedType); setError(''); setOpen(true) }
+  const save = async (payload) => { setSaving(true); setError(''); try { const result = await registerVendor(payload); setEmail(result.email); setLocalCode(result.verification_code || ''); setOpen(false) } catch (requestError) { setError(requestError.message) } finally { setSaving(false) } }
+  const verify = async (event) => { event.preventDefault(); setSaving(true); setError(''); try { await verifyEmailCode({ email, code }); setComplete(true) } catch (requestError) { setError(requestError.message) } finally { setSaving(false) } }
+
+  return <main className="min-h-screen bg-slate-50 px-4 py-10"><div className="mx-auto w-full max-w-3xl"><Link to="/marketplace" className="inline-block"><BrandLogo/></Link><section className="mt-8 overflow-hidden rounded-2xl border bg-white shadow-subtle"><header className="bg-gradient-to-r from-[#082d66] to-primary px-6 py-8 text-white sm:px-9"><p className="text-xs font-bold uppercase tracking-[.16em] text-blue-100">Partner with Quotation Global</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">Join as a Solution Provider</h1><p className="mt-2 max-w-xl text-sm leading-6 text-blue-100">Choose your registration type, submit your business details, and verify your email. Your profile will be reviewed before activation.</p></header><div className="p-6 sm:p-9">
+    {complete ? <div className="py-8 text-center"><CheckCircle2 className="mx-auto h-14 w-14 text-emerald-500"/><h2 className="mt-4 text-xl font-bold">Application submitted</h2><p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Your email is verified. An administrator will review your Solution Provider application before you can sign in.</p><Link to="/marketplace" className="mt-6 inline-flex h-10 items-center rounded-md bg-primary px-5 text-xs font-bold text-white">Return to marketplace</Link></div>
+      : email ? <form onSubmit={verify} className="mx-auto max-w-md py-5"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-blue-50 text-primary"><Mail className="h-5 w-5"/></span><h2 className="mt-4 text-center text-xl font-bold">Verify your email</h2><p className="mt-2 text-center text-sm text-slate-500">Enter the 6-digit code sent to <b>{email}</b>.</p>{localCode && <p className="mt-3 rounded-md bg-amber-50 p-3 text-center text-xs text-amber-800">Local verification code: <b>{localCode}</b></p>}<input autoFocus required inputMode="numeric" pattern="[0-9]{6}" maxLength="6" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))} className="mt-5 h-12 w-full rounded-md border px-3 text-center text-lg tracking-[.35em]" aria-label="Verification code"/>{error && <p className="mt-3 rounded-md bg-red-50 p-3 text-xs text-red-700">{error}</p>}<button disabled={saving || code.length !== 6} className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-bold text-white disabled:opacity-50">{saving ? 'Verifying...' : 'Verify & Submit Application'}</button></form>
+      : <><h2 className="text-lg font-bold">How would you like to register?</h2><p className="mt-1 text-sm text-slate-500">Select the option that best describes your business.</p><div className="mt-6 grid gap-4 sm:grid-cols-3">{options.map(({ type: optionType, label, description, icon: Icon }) => <button key={optionType} onClick={() => select(optionType)} className="rounded-xl border p-5 text-left transition hover:border-primary hover:bg-blue-50 hover:shadow-subtle"><span className="grid h-11 w-11 place-items-center rounded-lg bg-blue-50 text-primary"><Icon className="h-5 w-5"/></span><span className="mt-4 block text-sm font-bold text-slate-900">{label}</span><span className="mt-1 block text-xs leading-5 text-slate-500">{description}</span></button>)}</div><p className="mt-7 text-center text-xs text-slate-500">Already an approved provider? <Link to="/login" className="font-bold text-primary hover:underline">Log in</Link></p></>}
+  </div></section></div><VendorModal open={open} registrationType={type} saving={saving} serverError={error} onClearError={() => setError('')} onClose={() => setOpen(false)} onSave={save}/></main>
+}

@@ -22,9 +22,11 @@ use App\Http\Controllers\Api\MarketplaceMediaController;
 use App\Http\Controllers\Api\MarketplaceTemplateController;
 use App\Http\Controllers\Api\SellingCountryController;
 use App\Http\Controllers\Api\UserNotificationStateController;
+use App\Http\Controllers\Api\DashboardController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:authentication');
+Route::post('auth/register-vendor', [AuthController::class, 'registerVendor'])->middleware('throttle:authentication');
 Route::post('auth/verify-email', [AuthController::class, 'verifyEmail'])->middleware('throttle:authentication');
 Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:authentication');
 Route::post('auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-reset');
@@ -41,6 +43,7 @@ Route::get('marketplace/media/{asset}', [MarketplaceMediaController::class, 'sho
 Route::get('specifications', [SpecificationController::class, 'index']);
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('dashboard', [DashboardController::class, 'index']);
     Route::get('notification-states', [UserNotificationStateController::class, 'index']);
     Route::post('notification-states/read', [UserNotificationStateController::class, 'markRead']);
     Route::post('notification-states/clear', [UserNotificationStateController::class, 'clear']);

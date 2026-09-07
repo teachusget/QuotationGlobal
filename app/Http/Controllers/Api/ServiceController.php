@@ -144,7 +144,6 @@ class ServiceController extends Controller
     {
         $this->authorizeServiceOwner($request, $service);
         $data = $this->validateProduct($request);
-        if ($data['service_type'] === 'hardware') abort_if(Service::where('vendor_id', $vendor->id)->where('sku', $data['sku'])->where('name', '!=', $data['name'])->exists(), 422, 'This SKU is already used by another hardware product.');
         abort_unless(Category::whereKey($data['subcategory_id'])->where('parent_id', $data['category_id'])->exists(), 422, 'Selected subcategory does not belong to this category.');
 
         $original = ['vendor_id' => $service->vendor_id, 'name' => $service->name, 'service_type' => $service->service_type];
@@ -184,6 +183,7 @@ class ServiceController extends Controller
 
     public function store(Request $request)
     {
+        $this->normalizeHardwarePricing($request);
         $data = $request->validate([
             'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
             'name' => ['required', 'string', 'max:150'],
@@ -279,6 +279,7 @@ class ServiceController extends Controller
 
     private function validateProduct(Request $request): array
     {
+        $this->normalizeHardwarePricing($request);
         $data = $request->validate([
             'vendor_id' => ['nullable', 'integer', 'exists:vendors,id'],
             'name' => ['required', 'string', 'max:150'],
@@ -342,5 +343,17 @@ class ServiceController extends Controller
     {
         $allowed = $data['service_type'] === 'services' ? ['hourly', 'daily', 'monthly', 'annual'] : ['monthly', 'quarterly', 'semi_annual', 'annual'];
         abort_unless(collect($data['billing_cycles'])->every(fn ($cycle) => in_array($cycle, $allowed, true)), 422, 'Selected pricing frequency is not available for this service type.');
+    }
+
+    private function normalizeHardwarePricing(Request $request): void
+    {
+        if ($request->input('service_type') !== 'hardware') return;
+
+        // Hardware is sold at one unit price. "monthly" is retained only as the
+        // legacy database value so existing schemas do not need a fake plan type.
+        $request->merge([
+            'billing_cycles' => ['monthly'],
+            'discounts' => [],
+        ]);
     }
 }

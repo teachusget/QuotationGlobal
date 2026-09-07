@@ -11,11 +11,19 @@ function heroAds(document) {
   return document?.sections?.find((section) => section.type === 'hero')?.settings?.featured_ads || []
 }
 
-function withHeroAds(document, featuredAds) {
+function documentPlacements(document) {
+  return { banner: heroAds(document), catalog: document?.advertisements?.center || [], footer: document?.advertisements?.footer || [] }
+}
+
+function documentVisibility(document) {
+  return { banner: document?.advertisements_visibility?.banner !== false, catalog: document?.advertisements_visibility?.catalog !== false, footer: document?.advertisements_visibility?.footer !== false }
+}
+
+function withPlacements(document, placements, visibility) {
   const next = clone(document)
-  next.sections = (next.sections || []).map((section) => section.type === 'hero'
-    ? { ...section, settings: { ...section.settings, featured_ads: featuredAds } }
-    : section)
+  next.sections = (next.sections || []).map((section) => section.type === 'hero' ? { ...section, settings: { ...section.settings, featured_ads: placements.banner } } : section)
+  next.advertisements = { center: placements.catalog, footer: placements.footer }
+  next.advertisements_visibility = visibility
   return next
 }
 
@@ -24,7 +32,9 @@ export default function FeaturedBannerAdsPage() {
   const [document, setDocument] = useState(null)
   const [lockVersion, setLockVersion] = useState(1)
   const [services, setServices] = useState([])
-  const [ads, setAds] = useState([])
+  const [placements, setPlacements] = useState({ banner: [], catalog: [], footer: [] })
+  const [visibility, setVisibility] = useState({ banner: true, catalog: true, footer: true })
+  const [placement, setPlacement] = useState('banner')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -37,13 +47,16 @@ export default function FeaturedBannerAdsPage() {
         const draft = builder.data.draft_document
         setDocument(draft)
         setLockVersion(builder.data.lock_version || 1)
-        setAds(heroAds(draft))
+        setPlacements(documentPlacements(draft))
+        setVisibility(documentVisibility(draft))
         setServices(catalog.data?.services || [])
       })
       .catch((requestError) => setError(requestError.message))
       .finally(() => setLoading(false))
   }, [])
 
+  const ads = placements[placement] || []
+  const setAds = (update) => setPlacements((current) => ({ ...current, [placement]: typeof update === 'function' ? update(current[placement] || []) : update }))
   const selectedIds = useMemo(() => new Set(ads.map((ad) => Number(ad.service_id))), [ads])
   const available = useMemo(() => services.filter((service) => !selectedIds.has(Number(service.id)) && `${service.name} ${service.vendor || ''} ${service.service_type || ''}`.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 60), [search, selectedIds, services])
   const serviceMap = useMemo(() => new Map(services.map((service) => [Number(service.id), service])), [services])
@@ -61,12 +74,12 @@ export default function FeaturedBannerAdsPage() {
   const save = async (publish) => {
     setSaving(true); setError(''); setMessage('')
     try {
-      const nextDocument = withHeroAds(document, ads)
+      const nextDocument = withPlacements(document, placements, visibility)
       const saved = await saveMarketplaceDraft(nextDocument, lockVersion)
       setDocument(nextDocument)
       setLockVersion(saved.data.lock_version)
       if (publish) {
-        await publishMarketplace({ name: 'Featured banner ads', release_note: 'Updated marketplace hero featured software.' })
+        await publishMarketplace({ name: 'Advertisement placements', release_note: 'Updated banner, catalogue and footer advertisements.' })
         clearMarketplaceContentCache()
         setMessage('Featured banner ads saved and published on the marketplace.')
       } else setMessage('Featured banner ads saved to the marketplace draft.')
@@ -74,9 +87,10 @@ export default function FeaturedBannerAdsPage() {
   }
 
   return <section>
-    <PageHeader eyebrow="Marketplace settings" title="Featured Banner Ads" description="Choose which software appears in the marketplace hero banner, arrange its display order and control rotation timing." actions={<div className="flex gap-2">{can('marketplace_builder.update') && <Button variant="secondary" loading={saving} onClick={() => save(false)}>Save Draft</Button>}{can('marketplace_builder.publish') && <Button icon={MonitorPlay} loading={saving} onClick={() => save(true)}>Save & Publish</Button>}</div>}/>
+    <PageHeader eyebrow="Marketplace settings" title="Advertisement Placements" description="Manage banner, catalogue and footer product advertisements, including independent visibility and rotation." actions={<div className="flex gap-2">{can('marketplace_builder.update') && <Button variant="secondary" loading={saving} onClick={() => save(false)}>Save Draft</Button>}{can('marketplace_builder.publish') && <Button icon={MonitorPlay} loading={saving} onClick={() => save(true)}>Save & Publish</Button>}</div>}/>
     {error && <Alert className="mt-4">{error}</Alert>}
     {message && <Alert tone="success" className="mt-4">{message}</Alert>}
+    {!loading && <div className="mt-5 grid max-w-3xl grid-cols-3 gap-2 rounded-xl border bg-white p-1.5">{[['banner', '1. Banner'], ['catalog', '2. Catalogue'], ['footer', '3. Footer']].map(([key, label]) => <button type="button" key={key} onClick={() => setPlacement(key)} className={`rounded-lg px-4 py-2.5 text-xs font-bold transition ${placement === key ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-blue-50 hover:text-primary'}`}>{label}<span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${placement === key ? 'bg-white/20' : 'bg-slate-100'}`}>{placements[key]?.length || 0}</span></button>)}</div>}
     {loading ? <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_1.15fr]"><Skeleton className="h-96"/><Skeleton className="h-96"/></div> : <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
       <div className="rounded-2xl border bg-white p-5">
         <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold">Available software</p><p className="mt-1 text-xs text-slate-500">Search and add approved marketplace solutions.</p></div><span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-primary">{services.length} available</span></div>
@@ -84,7 +98,7 @@ export default function FeaturedBannerAdsPage() {
         <div className="mt-3 max-h-[520px] space-y-2 overflow-y-auto pr-1">{available.map((service) => <button type="button" key={service.id} disabled={!can('marketplace_builder.update')} onClick={() => add(service.id)} className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:border-blue-300 hover:bg-blue-50/50 disabled:cursor-not-allowed"><span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-100">{service.image_url ? <img src={service.image_url} alt="" className="h-full w-full object-contain p-1"/> : <Image className="h-5 w-5 text-slate-400"/>}</span><span className="min-w-0 flex-1"><b className="block truncate text-sm">{service.name}</b><span className="mt-0.5 block truncate text-xs text-slate-500">{service.vendor || 'Verified vendor'} · <span className="capitalize">{service.service_type}</span></span></span><span className="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-primary">Add</span></button>)}{!available.length && <p className="rounded-xl border border-dashed py-10 text-center text-xs text-slate-400">No matching software available.</p>}</div>
       </div>
       <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-violet-50 p-5">
-        <div className="flex items-center justify-between gap-3"><div><p className="text-sm font-bold">Banner rotation</p><p className="mt-1 text-xs text-slate-500">Ads display from top to bottom in this order.</p></div><span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-bold text-white">{ads.length} selected</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold">{{ banner: 'Banner rotation', catalog: 'Catalogue rotation', footer: 'Footer rotation' }[placement]}</p><p className="mt-1 text-xs text-slate-500">{{ banner: 'Displays inside the main marketplace banner.', catalog: 'Displays between products in Featured Solutions.', footer: 'Displays immediately above the marketplace footer.' }[placement]}</p></div><div className="flex items-center gap-3"><label className="inline-flex cursor-pointer items-center gap-2 rounded-full border bg-white px-3 py-2 text-xs font-bold"><input type="checkbox" checked={visibility[placement]} disabled={!can('marketplace_builder.update')} onChange={(event) => setVisibility((current) => ({ ...current, [placement]: event.target.checked }))} className="h-4 w-4 accent-primary"/>{visibility[placement] ? 'Visible' : 'Hidden'}</label><span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-bold text-white">{ads.length} selected</span></div></div>
         <div className="mt-4 space-y-3">{ads.map((ad, index) => { const service = serviceMap.get(Number(ad.service_id)); return <article key={ad.service_id} className="rounded-2xl border border-white bg-white p-3 shadow-sm"><div className="flex items-center gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-blue-50">{service?.image_url ? <img src={service.image_url} alt="" className="h-full w-full object-contain p-1"/> : <Image className="h-5 w-5 text-primary"/>}</span><span className="min-w-0 flex-1"><span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-primary">Position {index + 1}</span><b className="block truncate text-sm">{service?.name || `Software #${ad.service_id}`}</b><span className="block truncate text-xs text-slate-500">{service?.vendor || 'Vendor'}</span></span><div className="flex items-center gap-1"><button type="button" disabled={index === 0 || !can('marketplace_builder.update')} onClick={() => move(index, -1)} aria-label="Move up" className="grid h-9 w-9 place-items-center rounded-lg border text-slate-500 disabled:opacity-30"><ArrowUp className="h-4 w-4"/></button><button type="button" disabled={index === ads.length - 1 || !can('marketplace_builder.update')} onClick={() => move(index, 1)} aria-label="Move down" className="grid h-9 w-9 place-items-center rounded-lg border text-slate-500 disabled:opacity-30"><ArrowDown className="h-4 w-4"/></button><button type="button" disabled={!can('marketplace_builder.update')} onClick={() => remove(index)} aria-label="Remove" className="grid h-9 w-9 place-items-center rounded-lg border border-red-100 text-red-500 disabled:opacity-30"><Trash2 className="h-4 w-4"/></button></div></div><div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"><label className="text-xs font-semibold text-slate-600">Display time</label><span className="flex items-center gap-2"><input type="number" min="2" max="120" disabled={!can('marketplace_builder.update')} value={ad.duration_seconds || 6} onChange={(event) => duration(index, event.target.value)} className="h-8 w-20 rounded-lg border bg-white px-2 text-center text-xs font-bold"/><span className="text-xs text-slate-500">seconds</span></span></div></article>})}{!ads.length && <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-blue-200 bg-white/50 text-center"><div><Check className="mx-auto h-8 w-8 text-blue-300"/><p className="mt-3 text-sm font-semibold">No banner ads selected</p><p className="mt-1 text-xs text-slate-500">Add software from the list to start a rotation.</p></div></div>}</div>
       </div>
     </div>}

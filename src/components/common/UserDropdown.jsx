@@ -1,11 +1,11 @@
-import { Building2, CalendarClock, ChevronDown, FileText, ListChecks, LogOut, RotateCcw, Settings, UserRound } from 'lucide-react'
+import { Building2, CalendarClock, ChevronDown, FileText, ListChecks, LogOut, RotateCcw, Settings, ShoppingBag, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { isImpersonating, restoreAdminAuth } from '../../auth/session'
 import PortalActivityActions from '../layout/PortalActivityActions'
 
-const options = [
+const profileOptions = [
   { label: 'My Profile', path: '/profile', icon: UserRound },
   { label: 'Company Profile', path: '/company-profile', icon: Building2 },
   { label: 'Account Settings', path: '/account-settings', icon: Settings },
@@ -23,6 +23,7 @@ export default function UserDropdown() {
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close) }
   }, [])
   const isBuyer = user?.account_type === 'buyer'
+  const options = isBuyer ? [{ label: 'My Orders', path: '/orders', icon: ShoppingBag }, ...profileOptions] : profileOptions
   const isAdmin = !['buyer', 'vendor'].includes(user?.account_type)
   const impersonating = isImpersonating()
   const initials = (user?.name || 'User').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()

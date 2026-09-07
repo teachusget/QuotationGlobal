@@ -1,5 +1,6 @@
 import { Building2, CalendarClock, Check, Download, Eye, FileCheck2, FileText, FileUp, ImageIcon, Mail, PackageSearch, Paperclip, Send, UserRound, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { downloadBuyerAttachment, generatePurchaseOrder, getBuyerAttachmentPreviewUrl, getQuoteRequests, respondToVendorQuote, sendPurchaseOrder, sendVendorQuote } from '../api/rfqs'
 import { useAuth } from '../auth/useAuth'
 import CreateQuoteModal from '../components/rfqs/CreateQuoteModal'
@@ -31,12 +32,14 @@ function BuyerRequirementAttachment({ request }) {
 }
 
 export default function RfqsPage({ quotationOnly = false }) {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const isVendor = user?.account_type === 'vendor'
   const isBuyer = user?.account_type === 'buyer'
   const isAdmin = !isVendor && !isBuyer
   const [requests, setRequests] = useState([])
   const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [quoteRequest, setQuoteRequest] = useState(null)
@@ -47,7 +50,8 @@ export default function RfqsPage({ quotationOnly = false }) {
 
   const load = () => getQuoteRequests().then(setRequests).catch((err) => setError(err.message)).finally(() => setLoading(false))
   useEffect(() => { load() }, [])
-  const visible = useMemo(() => requests.filter((item) => (!quotationOnly || Boolean(item.quoted_at)) && `${item.service?.name || ''} ${item.user?.name || ''} ${item.user?.email || ''} ${item.vendor?.company_name || ''}`.toLowerCase().includes(query.trim().toLowerCase())), [requests, query, quotationOnly])
+  const visible = useMemo(() => requests.filter((item) => (!quotationOnly || Boolean(item.quoted_at)) && (!statusFilter || displayStatus(item) === statusFilter) && `${item.service?.name || ''} ${item.user?.name || ''} ${item.user?.email || ''} ${item.vendor?.company_name || ''}`.toLowerCase().includes(query.trim().toLowerCase())), [requests, query, quotationOnly, statusFilter])
+  const changeStatus = (value) => { setStatusFilter(value); const next = new URLSearchParams(searchParams); if (value) next.set('status', value); else next.delete('status'); setSearchParams(next, { replace: true }) }
 
   const sendQuote = async (payload, request = quoteRequest) => {
     setSaving(true); setError('')
@@ -72,7 +76,7 @@ export default function RfqsPage({ quotationOnly = false }) {
 
   return <section>
     <div className="rounded-2xl bg-gradient-to-r from-[#082d66] to-primary px-6 py-7 text-white sm:px-8"><div className="flex flex-wrap items-center justify-between gap-5"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-blue-200"><FileText className="h-4 w-4"/>{quotationOnly ? 'Procurement' : 'RFQ Inbox'}</div><h1 className="mt-2 text-2xl font-bold">{heading}</h1><p className="mt-2 max-w-2xl text-sm text-blue-100">{subtitle}</p></div><div className="rounded-xl border border-white/20 bg-white/10 px-6 py-4 text-center"><p className="text-3xl font-bold">{visible.length}</p><p className="text-[11px] text-blue-100">{quotationOnly ? 'Total Quotations' : 'Total RFQs'}</p></div></div></div>
-    <div className="mt-6 ui-toolbar shadow-subtle"><label className="relative block"><PackageSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search product, customer, vendor or email..." className="h-11 w-full rounded-lg border pl-10 pr-3 text-sm outline-none focus:border-primary"/></label></div>
+    <div className="mt-6 ui-toolbar shadow-subtle"><label className="relative min-w-0 flex-1"><PackageSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search product, customer, vendor or email..." className="h-11 w-full rounded-lg border pl-10 pr-3 text-sm outline-none focus:border-primary"/></label><select aria-label="Filter RFQs by status" value={statusFilter} onChange={(event) => changeStatus(event.target.value)} className="h-11 min-w-44 rounded-lg border bg-white px-3 text-xs font-semibold"><option value="">All statuses</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
     {error && !quoteRequest && <p className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">{error}</p>}
     {loading ? <div className="mt-6 space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-28 ui-skeleton ui-toolbar"><div className="h-full rounded-lg bg-slate-100"/></div>)}</div> : <div className="mt-6 space-y-3">
       {visible.map((item) => <article key={item.id} className="rounded-xl border bg-white p-5 transition hover:border-blue-200 hover:shadow-floating">

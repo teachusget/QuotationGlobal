@@ -32,6 +32,7 @@ export function registerUser(payload) {
     body: JSON.stringify(payload),
   })
 }
+export function registerVendor(payload) { return request('/api/auth/register-vendor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }) }
 export function verifyEmailCode(payload) { return request('/api/auth/verify-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }) }
 
 export function getCurrentUser() {

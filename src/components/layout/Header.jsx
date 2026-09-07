@@ -17,7 +17,7 @@ import useMarketplaceContent from '../../hooks/useMarketplaceContent'
 const actions = []
 
 function HeaderBrand({ compact, content, loading }) {
-  if (loading) return <span aria-hidden="true" className={`${compact ? 'h-10 w-[120px]' : 'h-[52px] w-[190px]'} block animate-pulse rounded-md bg-slate-100`}/>
+  if (loading) return <span aria-hidden="true" className={`${compact ? 'h-11 w-[138px]' : 'h-14 w-[215px]'} block animate-pulse rounded-md bg-slate-100`}/>
   return <BrandLogo compact={compact} branding={content?.document?.header} media={content?.media}/>
 }
 

@@ -210,6 +210,9 @@ class DemoRequestController extends Controller
             'buyer_notification_read_at' => null,
         ]);
 
+        $demoRequest->loadMissing(['service:id,name', 'vendor:id,company_name,name,email', 'user:id,name,email']);
+        $this->sendQuoteEmails($demoRequest, 'quote_sent');
+
         return response()->json(['message' => 'Quote sent to the customer.', 'data' => $demoRequest->fresh()]);
     }
 
@@ -309,7 +312,44 @@ class DemoRequestController extends Controller
             $requestRow->update(['buyer_attachment_name' => $file->getClientOriginalName(), 'buyer_attachment_path' => $file->store('quote-request-attachments'), 'buyer_attachment_mime' => $file->getMimeType(), 'buyer_attachment_size' => $file->getSize()]);
         }
 
+        if ($data['request_type'] === 'quote') {
+            $requestRow->loadMissing(['service:id,name', 'vendor:id,company_name,name,email', 'user:id,name,email']);
+            $this->sendQuoteEmails($requestRow, 'quote_requested');
+        }
+
         return response()->json(['message' => $data['request_type'] === 'demo' ? 'Demo request sent to the Solution Provider.' : 'Quote request sent successfully.', 'data' => $requestRow], $requestRow->wasRecentlyCreated ? 201 : 200);
+    }
+
+    private function sendQuoteEmails(DemoRequest $quote, string $event): void
+    {
+        $serviceName = $quote->service?->name ?? 'the requested service';
+        $vendorName = $quote->vendor?->company_name ?: ($quote->vendor?->name ?? 'Solution Provider');
+        $buyerName = $quote->user?->name ?? 'Customer';
+
+        $messages = $event === 'quote_requested'
+            ? [
+                [$quote->vendor?->email, $vendorName, 'New quote request received', "Hello {$vendorName},\n\n{$buyerName} has requested a quote for {$serviceName}. Please sign in to review and respond."],
+                [$quote->user?->email, $buyerName, 'Your quote request was sent', "Hello {$buyerName},\n\nYour quote request for {$serviceName} was sent to {$vendorName}. You will be notified when the vendor responds."],
+            ]
+            : [
+                [$quote->user?->email, $buyerName, 'Your quotation has arrived', "Hello {$buyerName},\n\n{$vendorName} has sent you a quotation for {$serviceName} for PKR ".number_format((float) $quote->quoted_price, 2).'. Please sign in to review it.'],
+                [$quote->vendor?->email, $vendorName, 'Quotation sent successfully', "Hello {$vendorName},\n\nYour quotation for {$serviceName} was sent successfully to {$buyerName}."],
+            ];
+
+        foreach ($messages as [$email, $name, $subject, $body]) {
+            if (! $email) continue;
+
+            try {
+                Mail::raw($body, fn ($mail) => $mail->to($email, $name)->subject($subject));
+            } catch (\Throwable $exception) {
+                Log::error('Quote email failed.', [
+                    'quote_request_id' => $quote->id,
+                    'event' => $event,
+                    'recipient' => $email,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
     }
 
     public function downloadBuyerAttachment(Request $request, DemoRequest $demoRequest)

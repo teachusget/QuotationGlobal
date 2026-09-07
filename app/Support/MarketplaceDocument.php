@@ -32,12 +32,34 @@ class MarketplaceDocument
         if (isset($document['theme']['muted']) && ! preg_match('/^#[0-9a-fA-F]{6}$/', (string) $document['theme']['muted'])) $errors['document.theme.muted'][] = 'Use a six-digit hex color.';
         if (mb_strlen((string) data_get($document, 'seo.title', '')) > 70) $errors['document.seo.title'][] = 'SEO title cannot exceed 70 characters.';
         if (mb_strlen((string) data_get($document, 'seo.description', '')) > 170) $errors['document.seo.description'][] = 'SEO description cannot exceed 170 characters.';
+        foreach (['banner', 'catalog', 'footer'] as $placement) {
+            $visible = data_get($document, "advertisements_visibility.$placement", true);
+            if (! is_bool($visible)) $errors["document.advertisements_visibility.$placement"][] = 'Advertisement visibility must be true or false.';
+        }
 
         $ids = [];
         self::walkBlocks($document['sections'] ?? [], $errors, $ids);
         self::walkLinks($document, $errors);
         self::rejectMarkup($document, $errors);
         self::validateMedia($document, $errors, $publishing);
+        foreach (['center', 'footer'] as $placement) {
+            $ads = data_get($document, "advertisements.$placement", []);
+            if (! is_array($ads) || count($ads) > 20) $errors["document.advertisements.$placement"][] = 'Select no more than 20 advertisements per placement.';
+            else {
+                $serviceIds = [];
+                foreach ($ads as $index => $ad) {
+                    if (! is_array($ad)) {
+                        $errors["document.advertisements.$placement.$index"][] = 'Advertisement settings must be an object.';
+                        continue;
+                    }
+                    $serviceId = (int) ($ad['service_id'] ?? 0);
+                    if ($serviceId < 1) $errors["document.advertisements.$placement.$index.service_id"][] = 'Select a valid solution.';
+                    if ((int) ($ad['duration_seconds'] ?? 0) < 2 || (int) ($ad['duration_seconds'] ?? 0) > 120) $errors["document.advertisements.$placement.$index.duration_seconds"][] = 'Duration must be between 2 and 120 seconds.';
+                    $serviceIds[] = $serviceId;
+                }
+                if (count($serviceIds) !== count(array_unique($serviceIds))) $errors["document.advertisements.$placement"][] = 'A solution can only appear once per placement.';
+            }
+        }
         if ($publishing) { self::validateCatalog($document, $errors); self::validateContrast($document, $errors); }
         if ($errors) throw ValidationException::withMessages($errors);
         return $document;
@@ -163,6 +185,11 @@ class MarketplaceDocument
             }
         };
         $walk($document['sections'] ?? []);
+        foreach (['center', 'footer'] as $placement) {
+            $ids = array_map('intval', array_column(data_get($document, "advertisements.$placement", []), 'service_id'));
+            $found = Service::whereIn('id', $ids)->pluck('id')->map(fn ($id) => (int) $id)->all();
+            foreach (array_diff($ids, $found) as $missing) $errors['document.catalog'][] = ucfirst($placement)." advertisement solution $missing is unavailable.";
+        }
     }
 
     private static function validateContrast(array $document, array &$errors): void

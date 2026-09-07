@@ -16,6 +16,6 @@ export const personalNavigation = [
   { label: 'Notifications', path: '/notifications', icon: Bell },
 ]
 export const bottomNavigation = [
-  { label: 'Help Center', path: '/help-center', icon: CircleHelp }, { label: 'Settings', path: '/settings', icon: Settings, children: [{ label: 'Featured Banner Ads', path: '/featured-banner-ads', icon: GalleryHorizontalEnd, permission: 'marketplace_builder.view' }, { label: 'Marketplace Builder', path: '/marketplace-builder', icon: Paintbrush, permission: 'marketplace_builder.view' }, { label: 'Selling Countries', path: '/selling-countries', icon: Globe2, permission: 'settings.manage' }] },
+  { label: 'Help Center', path: '/help-center', icon: CircleHelp }, { label: 'Settings', path: '/settings', icon: Settings, children: [{ label: 'Advertisement Placements', path: '/featured-banner-ads', icon: GalleryHorizontalEnd, permission: 'marketplace_builder.view' }, { label: 'Marketplace Builder', path: '/marketplace-builder', icon: Paintbrush, permission: 'marketplace_builder.view' }, { label: 'Selling Countries', path: '/selling-countries', icon: Globe2, permission: 'settings.manage' }] },
 ]
 export const allNavigation = [...primaryNavigation.flatMap((item) => [item, ...(item.children || [])]), ...personalNavigation, ...bottomNavigation.flatMap((item) => [item, ...(item.children || [])])]
