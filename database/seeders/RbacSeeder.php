@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -31,5 +32,19 @@ class RbacSeeder extends Seeder
         $super->syncPermissions(Permission::all());
         $buyer->syncPermissions(Permission::whereIn('name', ['rfqs.view','rfqs.respond','demos.view','messages.view','messages.send','purchase_orders.create'])->get());
         $vendor->syncPermissions(Permission::whereIn('name', ['vendors.view','customers.view','categories.view','industries.view','brands.view','brands.create','brands.update','services.view','services.create','services.update','services.delete','rfqs.view','rfqs.quote','demos.view','demos.update','messages.view','messages.send','purchase_orders.view','purchase_orders.send'])->get());
+
+        $email = env('SUPER_ADMIN_EMAIL');
+        $password = env('SUPER_ADMIN_PASSWORD');
+        if ($email && $password) {
+            $admin = User::updateOrCreate(['email' => $email], [
+                'name' => env('SUPER_ADMIN_NAME', 'Super Admin'),
+                'username' => env('SUPER_ADMIN_USERNAME', 'superadmin'),
+                'password' => $password,
+                'account_type' => 'staff',
+                'email_verified_at' => now(),
+                'is_blocked' => false,
+            ]);
+            $admin->syncRoles([$super]);
+        }
     }
 }
