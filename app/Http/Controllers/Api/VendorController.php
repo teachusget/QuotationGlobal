@@ -50,6 +50,8 @@ class VendorController extends Controller
             ]);
         });
 
+        Audit::record($request, 'vendor.created', $vendor, null, $this->auditSnapshot($vendor));
+
         return response()->json([
             'message' => 'Registration saved successfully.',
             'data' => $this->resource($vendor->load(['user:id', 'industry:id,name', 'serviceCategory:id,name'])),
@@ -59,6 +61,7 @@ class VendorController extends Controller
     public function update(Request $request, Vendor $vendor)
     {
         $this->authorizeAssignedVendor($request, $vendor);
+        $before = $this->auditSnapshot($vendor);
         $data = $this->validatedData($request);
         $this->authorizeVendor($request, $vendor);
 
@@ -79,6 +82,8 @@ class VendorController extends Controller
             }
         });
 
+        Audit::record($request, 'vendor.updated', $vendor, $before, $this->auditSnapshot($vendor->fresh()));
+
         return response()->json([
             'message' => 'Registration updated successfully.',
             'data' => $this->resource($vendor->load(['user:id', 'industry:id,name', 'serviceCategory:id,name'])),
@@ -89,10 +94,12 @@ class VendorController extends Controller
     {
         abort_if($request->user()->account_type === 'vendor', 403, 'Vendor accounts cannot delete vendors.');
         $this->authorizeAssignedVendor($request, $vendor);
+        $before = $this->auditSnapshot($vendor);
 
-        DB::transaction(function () use ($vendor) {
+        DB::transaction(function () use ($request, $vendor, $before) {
             $user = $vendor->user;
             $vendor->delete();
+            Audit::record($request, 'vendor.deleted', $vendor, $before);
             $user?->delete();
         });
 
@@ -246,5 +253,14 @@ class VendorController extends Controller
             'document_url' => $vendor->document_data ? url('/api/vendors/'.$vendor->id.'/document') : null,
             'logo_url' => $vendor->logo_data ? url('/api/vendors/'.$vendor->id.'/logo') : null,
         ];
+    }
+
+    private function auditSnapshot(Vendor $vendor): array
+    {
+        return $vendor->only([
+            'id', 'user_id', 'registration_type', 'name', 'first_name', 'last_name',
+            'email', 'phone', 'company_name', 'designation', 'business_type',
+            'industry_id', 'service_category_id', 'country', 'city', 'address', 'status',
+        ]);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Brand;
+use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
@@ -39,6 +40,7 @@ class BrandController extends Controller
         if ($request->user()->account_type === 'staff' && ! $request->user()->isSuperAdmin()) {
             $request->user()->assignedBrands()->syncWithoutDetaching([$item->id]);
         }
+        Audit::record($request, 'brand.created', $item, null, $item->only(['id', 'name', 'slug', 'details', 'status', 'vendor_id']));
 
         return response()->json(['message' => $vendor ? 'Brand submitted for admin approval.' : 'Saved successfully.', 'data' => $this->resource($item, (bool) $vendor)], 201);
     }
@@ -52,7 +54,9 @@ class BrandController extends Controller
             abort_unless($vendorId && (int) $brand->vendor_id === (int) $vendorId, 403, 'You can only edit brands submitted by your vendor account.');
         }
         $data = $this->validated($request, $brand);
+        $before = $brand->only(['id', 'name', 'slug', 'details', 'status', 'vendor_id']);
         $brand->update([...$this->attributes($data, $brand), ...($isVendor ? ['status' => 'pending'] : [])]);
+        Audit::record($request, 'brand.updated', $brand, $before, $brand->only(['id', 'name', 'slug', 'details', 'status', 'vendor_id']));
 
         return response()->json(['message' => $isVendor ? 'Brand changes submitted for admin approval.' : 'Saved successfully.', 'data' => $this->resource($brand->fresh(), $isVendor)]);
     }
@@ -61,7 +65,9 @@ class BrandController extends Controller
     {
         abort_if($request->user()->account_type === 'vendor', 403, 'Only administrators can approve brands.');
         $this->authorizeAssignedBrand($request, $brand);
+        $before = ['status' => $brand->status];
         $brand->update(['status' => 'approved']);
+        Audit::record($request, 'brand.approved', $brand, $before, ['status' => 'approved']);
         return response()->json(['message' => 'Brand approved successfully.', 'data' => $this->resource($brand->fresh())]);
     }
 
@@ -69,7 +75,9 @@ class BrandController extends Controller
     {
         abort_if($request->user()->account_type === 'vendor', 403, 'Vendor accounts cannot delete brands.');
         $this->authorizeAssignedBrand($request, $brand);
+        $before = $brand->only(['id', 'name', 'slug', 'details', 'status', 'vendor_id']);
         $brand->delete();
+        Audit::record($request, 'brand.deleted', $brand, $before);
 
         return response()->json(['message' => 'Deleted successfully.']);
     }

@@ -9,6 +9,7 @@ use App\Models\ServiceImage;
 use App\Models\ServiceRating;
 use App\Models\Vendor;
 use App\Models\PlatformSetting;
+use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
@@ -110,10 +111,12 @@ class ServiceController extends Controller
             'comment' => ['nullable', 'string', 'max:1000'],
         ]);
         $product = $this->canonicalProduct($service);
+        $before = ServiceRating::where('service_id', $product->id)->where('user_id', $request->user()->id)->first()?->only(['rating', 'comment']);
         $rating = ServiceRating::updateOrCreate(
             ['service_id' => $product->id, 'user_id' => $request->user()->id],
             ['rating' => $data['rating'], 'comment' => trim($data['comment'] ?? '') ?: null]
         );
+        Audit::record($request, $rating->wasRecentlyCreated ? 'service_rating.created' : 'service_rating.updated', $rating, $before, $rating->only(['id', 'service_id', 'user_id', 'rating', 'comment']));
 
         return response()->json(['message' => $rating->wasRecentlyCreated ? 'Rating added successfully.' : 'Rating updated successfully.']);
     }
@@ -124,7 +127,9 @@ class ServiceController extends Controller
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             abort_unless($service->vendor_id === $vendor->id, 403, 'You can only delete your own service plans.');
         }
+        $before = $this->auditSnapshot($service);
         $service->delete();
+        Audit::record($request, 'service.deleted', $service, $before);
         return response()->json(['message' => 'Service plan deleted successfully.']);
     }
 
@@ -135,14 +140,17 @@ class ServiceController extends Controller
             abort_unless($service->vendor_id === $vendor->id, 403, 'You can only update your own service plans.');
         }
         $data = $request->validate(['monthly_price' => ['required', 'numeric', 'min:0'], 'discount_percent' => ['required', 'numeric', 'min:0', 'max:100']]);
+        $before = $this->auditSnapshot($service);
         $months = $service->service_type === 'services' ? ['hourly' => 1 / 720, 'daily' => 1 / 30, 'monthly' => 1, 'annual' => 12][$service->billing_cycle] : ['monthly' => 1, 'quarterly' => 3, 'semi_annual' => 6, 'annual' => 12][$service->billing_cycle];
         $service->update([...$data, 'price_from' => round($data['monthly_price'] * $months * (1 - $data['discount_percent'] / 100), 2)]);
+        Audit::record($request, 'service.updated', $service, $before, $this->auditSnapshot($service->fresh()));
         return response()->json(['message' => 'Service plan updated.', 'data' => $service->load(['industries:id,name', 'brands:id,name'])]);
     }
 
     public function updateProduct(Request $request, Service $service)
     {
         $this->authorizeServiceOwner($request, $service);
+        $before = Service::where('vendor_id', $service->vendor_id)->where('name', $service->name)->where('service_type', $service->service_type)->get()->map(fn ($plan) => $this->auditSnapshot($plan))->all();
         $data = $this->validateProduct($request);
         abort_unless(Category::whereKey($data['subcategory_id'])->where('parent_id', $data['category_id'])->exists(), 422, 'Selected subcategory does not belong to this category.');
 
@@ -170,6 +178,7 @@ class ServiceController extends Controller
                 return $plan->load(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'industries:id,name', 'brands:id,name']);
             });
         });
+        Audit::record($request, 'service.product_updated', $service, ['plans' => $before], ['plans' => $services->map(fn ($plan) => $this->auditSnapshot($plan))->all()]);
 
         return response()->json(['message' => 'Complete service updated successfully.', 'data' => $services]);
     }
@@ -177,7 +186,10 @@ class ServiceController extends Controller
     public function destroyProduct(Request $request, Service $service)
     {
         $this->authorizeServiceOwner($request, $service);
+        $plans = Service::where('vendor_id', $service->vendor_id)->where('name', $service->name)->where('service_type', $service->service_type)->get();
+        $before = $plans->map(fn ($plan) => $this->auditSnapshot($plan))->all();
         Service::where('vendor_id', $service->vendor_id)->where('name', $service->name)->where('service_type', $service->service_type)->delete();
+        Audit::record($request, 'service.product_deleted', $service, ['plans' => $before]);
         return response()->json(['message' => 'Complete service and all pricing plans deleted successfully.']);
     }
 
@@ -244,6 +256,9 @@ class ServiceController extends Controller
                 return $service;
             });
         });
+        foreach ($services as $service) {
+            Audit::record($request, 'service.created', $service, null, $this->auditSnapshot($service));
+        }
         return response()->json(['message' => 'Service pricing saved successfully.', 'data' => $services->map(fn ($service) => $service->load(['category:id,name', 'subcategory:id,name', 'industries:id,name', 'brands:id,name']))], 201);
     }
 
@@ -267,6 +282,17 @@ class ServiceController extends Controller
             ->where('name', $service->name)
             ->where('service_type', $service->service_type)
             ->oldest('id')->firstOrFail();
+    }
+
+    private function auditSnapshot(Service $service): array
+    {
+        return $service->only([
+            'id', 'vendor_id', 'category_id', 'subcategory_id', 'industry_id', 'brand_id',
+            'name', 'service_type', 'sku', 'deployment', 'ai_enabled', 'pricing_mode',
+            'monthly_price', 'billing_cycle', 'discount_percent', 'price_from',
+            'inventory_quantity', 'low_stock_threshold', 'track_inventory',
+            'sell_globally', 'selling_countries',
+        ]);
     }
 
     private function authorizeServiceOwner(Request $request, Service $service): void

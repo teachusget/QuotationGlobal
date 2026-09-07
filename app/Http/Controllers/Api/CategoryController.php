@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\SpecificationDefinition;
+use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
@@ -57,6 +58,7 @@ class CategoryController extends Controller
             $request->user()->assignedSubcategories()->syncWithoutDetaching([$item->id]);
         }
         $this->syncKeyPoints($item, $data);
+        Audit::record($request, 'category.created', $item, null, $this->auditSnapshot($item, $data));
 
         return response()->json(['message' => 'Saved successfully.', 'data' => $this->resource($item->load('parent'))], 201);
     }
@@ -64,9 +66,11 @@ class CategoryController extends Controller
     public function update(Request $request, Category $category)
     {
         $this->authorizeAssignedSubcategory($request, $category);
+        $before = $this->auditSnapshot($category);
         $data = $this->validateRequest($request);
         $category->update($this->attributes($data, $category));
         $this->syncKeyPoints($category, $data);
+        Audit::record($request, 'category.updated', $category, $before, $this->auditSnapshot($category, $data));
 
         return response()->json(['message' => 'Saved successfully.', 'data' => $this->resource($category->load('parent'))]);
     }
@@ -74,8 +78,10 @@ class CategoryController extends Controller
     public function destroy(Request $request, Category $category)
     {
         $this->authorizeAssignedSubcategory($request, $category);
+        $before = $this->auditSnapshot($category);
         SpecificationDefinition::where('source', 'subcategory_key_point')->where(fn ($query) => $query->where('subcategory_id', $category->id)->orWhere('category_id', $category->id))->delete();
         $category->delete();
+        Audit::record($request, 'category.deleted', $category, $before);
 
         return response()->json(['message' => 'Deleted successfully.']);
     }
@@ -109,6 +115,12 @@ return $data;
     private function resource(Category $item): array
     {
         return ['id' => $item->id, 'parent_id' => $item->parent_id, 'name' => $item->name, 'slug' => $item->slug, 'details' => $item->details, 'key_points' => $item->parent_id ? SpecificationDefinition::where('subcategory_id', $item->id)->where('source', 'subcategory_key_point')->orderBy('sort_order')->pluck('name')->all() : [], 'logo_url' => $item->logo_data ? url('/api/categories/'.$item->id.'/logo') : null, 'parent' => $item->parent ? ['id' => $item->parent->id, 'name' => $item->parent->name] : null, 'created_at' => $item->created_at, 'updated_at' => $item->updated_at];
+    }
+
+    private function auditSnapshot(Category $category, array $data = []): array
+    {
+        return $category->only(['id', 'parent_id', 'name', 'slug', 'details'])
+            + ['key_points' => $data['key_points'] ?? SpecificationDefinition::where('subcategory_id', $category->id)->where('source', 'subcategory_key_point')->orderBy('sort_order')->pluck('name')->all()];
     }
 
     private function syncKeyPoints(Category $category, array $data): void

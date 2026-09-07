@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
@@ -35,7 +36,7 @@ class AuthController extends Controller
             'business_type' => ['nullable', 'string', 'max:100'],
         ]);
         $code = (string) random_int(100000, 999999);
-        DB::transaction(function () use ($data, $code) {
+        $vendor = DB::transaction(function () use ($data, $code) {
             $user = User::create([
                 'name' => trim($data['name']), 'email' => trim($data['email']), 'phone' => trim($data['phone']),
                 'company_name' => trim($data['company_name']), 'address' => trim($data['address'] ?? ''),
@@ -44,11 +45,12 @@ class AuthController extends Controller
                 'email_verification_expires_at' => now()->addMinutes(10),
             ]);
             $user->syncRoles(['Vendor']);
-            Vendor::create([
+            return Vendor::create([
                 ...collect($data)->except(['password_confirmation'])->all(), 'user_id' => $user->id,
                 'password' => Hash::make($data['password']), 'status' => 'pending_approval',
             ]);
         });
+        Audit::record($request, 'vendor.registration_submitted', $vendor, null, $vendor->only(['id', 'user_id', 'registration_type', 'name', 'email', 'phone', 'company_name', 'country', 'city', 'status']), $vendor->user);
         Mail::raw("Your Quotation Global Solution Provider verification code is: {$code}\n\nThis code expires in 10 minutes.", fn ($mail) => $mail->to($data['email'], $data['name'])->subject('Verify your Solution Provider application'));
         return response()->json(['message' => 'Application received. Verify your email to submit it for approval.', 'email' => $data['email'], 'requires_verification' => true, 'verification_code' => app()->isLocal() ? $code : null], 201);
     }
@@ -75,6 +77,7 @@ class AuthController extends Controller
         $user->fill([...$data, 'account_type' => 'buyer', 'email_verification_code' => Hash::make($code), 'email_verification_expires_at' => now()->addMinutes(10)]);
         $user->save();
         $user->syncRoles(['Buyer']);
+        Audit::record($request, $existing ? 'buyer.registration_resubmitted' : 'buyer.registered', $user, null, $user->only(['id', 'name', 'username', 'email', 'phone', 'company_name', 'city', 'country', 'account_type']), $user);
         Mail::raw("Your Quotation Global verification code is: {$code}\n\nThis code expires in 10 minutes.", fn ($mail) => $mail->to($user->email)->subject('Verify your Quotation Global account'));
         return response()->json([
             'message' => 'A verification code was sent to your email.',
@@ -92,6 +95,7 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['code' => ['The verification code is invalid or expired.']]);
         }
         $user->update(['email_verified_at' => now(), 'email_verification_code' => null, 'email_verification_expires_at' => null, 'last_login_at' => now()]);
+        Audit::record($request, 'account.email_verified', $user, ['email_verified' => false], ['email_verified' => true], $user);
         if ($user->account_type === 'vendor') {
             return response()->json(['message' => 'Email verified. Your application is now pending administrator approval.', 'pending_approval' => true]);
         }
@@ -126,6 +130,7 @@ class AuthController extends Controller
         $user->update(['last_login_at' => now()]);
 
         $user->tokens()->delete();
+        Audit::record($request, 'account.logged_in', $user, null, ['last_login_at' => $user->last_login_at], $user);
 
         return response()->json($this->authenticationResponse($user));
     }
@@ -137,6 +142,7 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        Audit::record($request, 'account.logged_out', $request->user());
         $request->user()->currentAccessToken()?->delete();
 
         return response()->json(['message' => 'Logged out successfully.']);
@@ -156,6 +162,7 @@ class AuthController extends Controller
             'vendor_id' => $vendor->id,
             'vendor_user_id' => $vendorUser->id,
         ]);
+        Audit::record($request, 'vendor.impersonation_started', $vendor, null, ['vendor_user_id' => $vendorUser->id]);
 
         return response()->json([
             'user' => $this->serializeUser($vendorUser),
@@ -174,6 +181,7 @@ class AuthController extends Controller
         $token = Password::createToken($user);
         $user->sendPasswordResetNotification($token);
         $resetUrl = url('/reset-password/'.$token).'?email='.urlencode($user->email);
+        Audit::record($request, 'account.password_reset_requested', $user);
 
         return response()->json([
             'message' => 'Password reset instructions have been sent.',
@@ -202,6 +210,8 @@ class AuthController extends Controller
                 'email' => [__($status)],
             ]);
         }
+        $user = User::where('email', $data['email'])->firstOrFail();
+        Audit::record($request, 'account.password_reset_completed', $user, null, null, $user);
 
         return response()->json([
             'message' => 'Password reset successfully. You can now sign in.',
@@ -224,11 +234,13 @@ class AuthController extends Controller
             'username' => ['nullable', 'string', 'max:80', 'alpha_dash', Rule::unique('users', 'username')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:30'],
         ]);
+        $before = $user->only(['name', 'username', 'phone']);
         $user->update($data);
         if ($user->account_type === 'vendor' && $user->vendorProfile) {
             $parts = preg_split('/\s+/', trim($data['name']), 2);
             $user->vendorProfile->update(['name' => $data['name'], 'first_name' => $parts[0] ?? '', 'last_name' => $parts[1] ?? '', 'phone' => $data['phone'] ?? $user->vendorProfile->phone]);
         }
+        Audit::record($request, 'account.profile_updated', $user, $before, $user->only(['name', 'username', 'phone']));
         return response()->json(['message' => 'Profile updated successfully.', 'user' => $this->serializeUser($user->fresh())]);
     }
 
@@ -242,6 +254,7 @@ class AuthController extends Controller
             'city' => ['nullable', 'string', 'max:100'],
             'country' => ['nullable', 'string', 'max:100'],
         ]);
+        $before = $user->only(['company_name', 'address', 'city', 'country']);
         DB::transaction(function () use ($user, $data) {
             $user->update($data);
             if ($user->account_type === 'vendor' && $user->vendorProfile) {
@@ -254,6 +267,7 @@ class AuthController extends Controller
                 ]);
             }
         });
+        Audit::record($request, 'account.company_updated', $user, $before, $user->fresh()->only(['company_name', 'address', 'city', 'country']));
         return response()->json(['message' => 'Company profile updated successfully.', 'user' => $this->serializeUser($user->fresh())]);
     }
 
@@ -270,6 +284,7 @@ class AuthController extends Controller
         $user->forceFill(['password' => $data['password'], 'remember_token' => Str::random(60)])->save();
         $currentTokenId = $user->currentAccessToken()?->id;
         $user->tokens()->when($currentTokenId, fn ($query) => $query->where('id', '!=', $currentTokenId))->delete();
+        Audit::record($request, 'account.password_updated', $user);
         return response()->json(['message' => 'Password updated successfully. Other sessions have been signed out.']);
     }
 

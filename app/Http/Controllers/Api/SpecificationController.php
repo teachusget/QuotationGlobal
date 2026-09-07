@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\SpecificationDefinition;
+use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -30,18 +31,23 @@ class SpecificationController extends Controller
     public function store(Request $request)
     {
         $item = SpecificationDefinition::create($this->validated($request));
+        Audit::record($request, 'specification.created', $item, null, $item->toArray());
         return response()->json(['message' => 'Specification created.', 'data' => $item], 201);
     }
 
     public function update(Request $request, SpecificationDefinition $specification)
     {
+        $before = $specification->toArray();
         $specification->update($this->validated($request));
+        Audit::record($request, 'specification.updated', $specification, $before, $specification->fresh()->toArray());
         return response()->json(['message' => 'Specification updated.', 'data' => $specification]);
     }
 
-    public function destroy(SpecificationDefinition $specification)
+    public function destroy(Request $request, SpecificationDefinition $specification)
     {
+        $before = $specification->toArray();
         $specification->delete();
+        Audit::record($request, 'specification.deleted', $specification, $before);
         return response()->json(['message' => 'Specification deleted.']);
     }
 

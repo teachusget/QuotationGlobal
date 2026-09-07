@@ -8,6 +8,7 @@ use App\Models\DemoMessage;
 use App\Models\Service;
 use App\Models\Vendor;
 use App\Models\PurchaseOrder;
+use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
@@ -198,6 +199,7 @@ class DemoRequestController extends Controller
                 'vendor_quote_attachment_size' => $attachment->getSize(),
             ];
         }
+        $before = $demoRequest->only(['status', 'quoted_price', 'quote_valid_until', 'quote_revision', 'quoted_at']);
         $demoRequest->update([
             ...$data,
             ...$attachmentData,
@@ -211,6 +213,7 @@ class DemoRequestController extends Controller
         ]);
 
         $demoRequest->loadMissing(['service:id,name', 'vendor:id,company_name,name,email', 'user:id,name,email']);
+        Audit::record($request, 'quote.sent', $demoRequest, $before, $demoRequest->only(['status', 'quoted_price', 'quote_valid_until', 'quote_revision', 'quoted_at', 'quote_sent_by']));
         $this->sendQuoteEmails($demoRequest, 'quote_sent');
 
         return response()->json(['message' => 'Quote sent to the customer.', 'data' => $demoRequest->fresh()]);
@@ -222,6 +225,7 @@ class DemoRequestController extends Controller
         abort_unless($demoRequest->status === 'quoted', 422, 'This quote is no longer awaiting a response.');
         abort_if($demoRequest->quote_valid_until?->isPast(), 422, 'This quote has expired.');
         $data = $request->validate(['decision' => ['required', Rule::in(['accept', 'decline'])]]);
+        $before = $demoRequest->only(['status', 'buyer_quote_response_at']);
         DB::transaction(function () use ($demoRequest, $data) {
             $accepted = $data['decision'] === 'accept';
             $demoRequest->update(['status' => $accepted ? 'quote_accepted' : 'quote_declined', 'buyer_quote_response_at' => now(), 'buyer_notification_read_at' => now()]);
@@ -229,6 +233,7 @@ class DemoRequestController extends Controller
                 DemoRequest::where('request_type', 'quote')->where('user_id', $demoRequest->user_id)->whereKeyNot($demoRequest->id)->whereIn('status', ['pending', 'quoted'])->update(['status' => 'quote_declined', 'buyer_quote_response_at' => now(), 'buyer_notification_read_at' => now()]);
             }
         });
+        Audit::record($request, $data['decision'] === 'accept' ? 'quote.accepted' : 'quote.declined', $demoRequest, $before, $demoRequest->fresh()->only(['status', 'buyer_quote_response_at']));
 
         return response()->json(['message' => $data['decision'] === 'accept' ? 'Quote accepted. All other open quotes were declined.' : 'Quote declined.', 'data' => $demoRequest->fresh('purchaseOrder')]);
     }
@@ -253,6 +258,9 @@ class DemoRequestController extends Controller
                 'notes' => $demoRequest->quote_message, 'terms' => $demoRequest->quote_terms,
             ],
         ]);
+        if ($po->wasRecentlyCreated) {
+            Audit::record($request, 'purchase_order.created', $po, null, $po->only(['id', 'po_number', 'demo_request_id', 'user_id', 'vendor_id', 'total_amount', 'currency', 'status', 'issued_at']));
+        }
         return response()->json(['message' => 'Purchase order draft generated. Review it before sending.', 'data' => $po], 201);
     }
 
@@ -261,7 +269,9 @@ class DemoRequestController extends Controller
         abort_unless($request->user()->account_type === 'buyer' && $demoRequest->user_id === $request->user()->id, 403);
         abort_unless($demoRequest->status === 'quote_accepted', 422, 'This quote is not accepted.');
         $po = $demoRequest->purchaseOrder()->firstOrFail();
+        $before = $po->only(['status', 'sent_at']);
         if ($po->status !== 'sent') $po->update(['status' => 'sent', 'sent_at' => now()]);
+        Audit::record($request, 'purchase_order.sent', $po, $before, $po->fresh()->only(['status', 'sent_at']));
         return response()->json(['message' => 'Purchase order sent to the Solution Provider.', 'data' => $po->fresh()]);
     }
 
@@ -281,9 +291,11 @@ class DemoRequestController extends Controller
     {
         $data = $request->validate(['vendor_id' => ['required', Rule::exists('vendors', 'id')->where('status', 'approved')]]);
         $vendor = Vendor::findOrFail($data['vendor_id']);
+        $before = ['vendor_id' => $purchaseOrder->vendor_id];
         $snapshot = $purchaseOrder->order_data;
         $snapshot['vendor'] = ['name' => $vendor->company_name ?: $vendor->name, 'email' => $vendor->email, 'phone' => $vendor->phone, 'address' => trim(implode(', ', array_filter([$vendor->address, $vendor->city, $vendor->country])))];
         $purchaseOrder->update(['vendor_id' => $vendor->id, 'order_data' => $snapshot]);
+        Audit::record($request, 'purchase_order.vendor_assigned', $purchaseOrder, $before, ['vendor_id' => $vendor->id]);
         return response()->json(['message' => 'Purchase order assigned to '.$snapshot['vendor']['name'].'.', 'data' => $purchaseOrder->fresh(['quoteRequest.service:id,name', 'quoteRequest.user:id,name,email', 'vendor:id,company_name,name,email'])]);
     }
 
@@ -300,6 +312,7 @@ class DemoRequestController extends Controller
             'attachment' => ['nullable', 'file', 'max:2048', 'mimes:jpg,jpeg,png,webp,pdf,doc,docx,xls,xlsx,csv,txt,rtf,odt,ods'],
         ]);
         $service = Service::findOrFail($data['service_id']);
+        $existingBefore = DemoRequest::where('service_id', $service->id)->where('user_id', $request->user()->id)->where('request_type', $data['request_type'])->first()?->only(['id', 'vendor_id', 'demo_at', 'quote_purpose', 'expected_users', 'currently_using', 'current_brand_name', 'status']);
         $requestRow = DemoRequest::updateOrCreate([
             'service_id' => $service->id,
             'user_id' => $request->user()->id,
@@ -316,6 +329,7 @@ class DemoRequestController extends Controller
             $requestRow->loadMissing(['service:id,name', 'vendor:id,company_name,name,email', 'user:id,name,email']);
             $this->sendQuoteEmails($requestRow, 'quote_requested');
         }
+        Audit::record($request, $requestRow->wasRecentlyCreated ? $data['request_type'].'.requested' : $data['request_type'].'.request_updated', $requestRow, $existingBefore, $requestRow->only(['id', 'service_id', 'user_id', 'vendor_id', 'request_type', 'demo_at', 'quote_purpose', 'expected_users', 'currently_using', 'current_brand_name', 'status']));
 
         return response()->json(['message' => $data['request_type'] === 'demo' ? 'Demo request sent to the Solution Provider.' : 'Quote request sent successfully.', 'data' => $requestRow], $requestRow->wasRecentlyCreated ? 201 : 200);
     }
@@ -381,6 +395,8 @@ class DemoRequestController extends Controller
             abort_unless($demoRequest->vendor_id === $vendor->id, 403, 'You can only update requests for your own products.');
         }
 
+        $before = $demoRequest->only(['status', 'rejection_reason', 'meeting_link']);
+
         if ($data['status'] === 'accepted' && $demoRequest->status !== 'accepted') {
             $meetingLink = 'https://meet.jit.si/QuotationPK-Demo-'.$demoRequest->id.'-'.Str::lower(Str::random(32));
             $demoRequest->update(['status' => 'accepted', 'meeting_link' => $meetingLink, 'rejection_reason' => null, 'buyer_notification_read_at' => null]);
@@ -406,6 +422,8 @@ class DemoRequestController extends Controller
                 'buyer_notification_read_at' => null,
             ]);
         }
+
+        Audit::record($request, 'demo_request.'.$data['status'], $demoRequest, $before, $demoRequest->fresh()->only(['status', 'rejection_reason', 'meeting_link']));
 
         return response()->json(['message' => 'Demo request '.$data['status'].'.', 'data' => $demoRequest->fresh()]);
     }
@@ -473,6 +491,7 @@ class DemoRequestController extends Controller
                 ? ['vendor_read_at' => now()]
                 : ($request->user()->account_type === 'buyer' ? ['buyer_read_at' => now()] : ['admin_read_at' => now()])),
         ]);
+        Audit::record($request, 'demo_message.created', $message, null, $message->only(['id', 'demo_request_id', 'user_id', 'attachment_type', 'attachment_name', 'is_system']));
 
         return response()->json(['data' => $message->load('user:id,name,account_type')], 201);
     }
@@ -485,7 +504,9 @@ class DemoRequestController extends Controller
             'blocked' => ['required', 'boolean'],
         ]);
         $column = $data['participant'].'_chat_blocked';
+        $before = [$column => $demoRequest->{$column}];
         $demoRequest->update([$column => $data['blocked']]);
+        Audit::record($request, $data['blocked'] ? 'demo_chat.blocked' : 'demo_chat.restored', $demoRequest, $before, [$column => $demoRequest->{$column}]);
 
         return response()->json([
             'message' => ucfirst($data['participant']).' messaging has been '.($data['blocked'] ? 'stopped.' : 'restored.'),

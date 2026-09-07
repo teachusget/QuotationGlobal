@@ -32,6 +32,7 @@ class MarketplaceTemplateController extends Controller
         $data = $this->validated($request);
         $document = MarketplaceDocument::validate($data['document']);
         $template = MarketplaceTemplate::create([...$data, 'slug' => $this->uniqueSlug($data['name']), 'document' => $document, 'design_tokens' => $data['design_tokens'] ?? $document['theme'], 'created_by' => $request->user()->id, 'updated_by' => $request->user()->id]);
+        Audit::record($request, 'marketplace.template_created', $template, null, $this->auditSnapshot($template));
         return response()->json(['message' => 'Marketplace theme created.', 'data' => $this->resource($template)], 201);
     }
 
@@ -43,10 +44,12 @@ class MarketplaceTemplateController extends Controller
 
     public function update(Request $request, MarketplaceTemplate $template)
     {
+        $before = $this->auditSnapshot($template);
         $data = $this->validated($request, $template);
         if (isset($data['document'])) $data['document'] = MarketplaceDocument::validate($data['document']);
         if (isset($data['name']) && $data['name'] !== $template->name) $data['slug'] = $this->uniqueSlug($data['name'], $template);
         $template->update([...$data, 'updated_by' => $request->user()->id]);
+        Audit::record($request, 'marketplace.template_updated', $template, $before, $this->auditSnapshot($template->fresh()));
         return response()->json(['message' => 'Marketplace theme updated.', 'data' => $this->resource($template->fresh())]);
     }
 
@@ -55,6 +58,7 @@ class MarketplaceTemplateController extends Controller
         abort_if($template->status === 'archived', 422, 'Archived themes cannot be cloned.');
         $name = trim($request->validate(['name' => ['nullable', 'string', 'max:120']])['name'] ?? '') ?: $template->name.' Copy';
         $copy = MarketplaceTemplate::create(['name' => $name, 'slug' => $this->uniqueSlug($name), 'description' => $template->description, 'thumbnail_url' => $template->thumbnail_url, 'status' => 'active', 'document' => $template->document, 'design_tokens' => $template->design_tokens, 'variants' => $template->variants, 'created_by' => $request->user()->id, 'updated_by' => $request->user()->id]);
+        Audit::record($request, 'marketplace.template_cloned', $copy, ['source_template_id' => $template->id], $this->auditSnapshot($copy));
         return response()->json(['message' => 'Marketplace theme cloned.', 'data' => $this->resource($copy)], 201);
     }
 
@@ -79,7 +83,9 @@ class MarketplaceTemplateController extends Controller
     {
         $inUse = MarketplacePage::where('active_template_id', $template->id)->orWhere('draft_template_id', $template->id)->exists();
         if ($inUse) throw ValidationException::withMessages(['template' => ['Active or draft theme cannot be archived. Apply another theme first.']]);
+        $before = $this->auditSnapshot($template);
         $template->update(['status' => 'archived', 'archived_at' => now(), 'updated_by' => $request->user()->id]);
+        Audit::record($request, 'marketplace.template_archived', $template, $before, $this->auditSnapshot($template->fresh()));
         return response()->json(['message' => 'Marketplace theme archived.']);
     }
 
@@ -136,5 +142,11 @@ class MarketplaceTemplateController extends Controller
     private function resource(MarketplaceTemplate $template, ?MarketplacePage $page = null): array
     {
         return ['id' => $template->id, 'name' => $template->name, 'slug' => $template->slug, 'description' => $template->description, 'thumbnail_url' => $template->thumbnail_url, 'status' => $template->status, 'design_tokens' => $template->design_tokens, 'variants' => $template->variants, 'section_count' => count($template->document['sections'] ?? []), 'is_active' => $page?->active_template_id === $template->id, 'is_draft' => $page?->draft_template_id === $template->id, 'updated_at' => $template->updated_at, 'updated_by' => $template->updater?->name];
+    }
+
+    private function auditSnapshot(MarketplaceTemplate $template): array
+    {
+        return $template->only(['id', 'name', 'slug', 'description', 'status', 'created_by', 'updated_by', 'archived_at'])
+            + ['section_count' => count($template->document['sections'] ?? [])];
     }
 }

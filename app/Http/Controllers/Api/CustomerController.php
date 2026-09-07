@@ -115,15 +115,19 @@ class CustomerController extends Controller {
         abort_if($request->user()->account_type === 'vendor', 403, 'Vendor accounts have view-only access to their leads and customers.');
         abort_unless($customer->account_type === 'buyer', 422, 'Only customer accounts can be blocked.');
         $data = $request->validate(['blocked' => ['required', 'boolean']]);
+        $before = ['is_blocked' => $customer->is_blocked];
         $customer->update(['is_blocked' => $data['blocked']]);
         if ($data['blocked']) $customer->tokens()->delete();
+        Audit::record($request, $data['blocked'] ? 'customer.blocked' : 'customer.unblocked', $customer, $before, ['is_blocked' => $customer->is_blocked]);
         return response()->json(['message' => $data['blocked'] ? 'Customer blocked.' : 'Customer unblocked.', 'data' => $customer->only(['id', 'is_blocked'])]);
     }
 
-    public function destroy(User $customer) {
+    public function destroy(Request $request, User $customer) {
         abort_unless($customer->account_type === 'buyer', 422, 'Only customer accounts can be deleted.');
+        $before = $customer->only(['id', 'name', 'username', 'email', 'phone', 'company_name', 'account_type', 'is_blocked']);
         $customer->tokens()->delete();
         $customer->delete();
+        Audit::record($request, 'customer.deleted', $customer, $before);
         return response()->json(['message' => 'Customer deleted permanently.']);
     }
 }

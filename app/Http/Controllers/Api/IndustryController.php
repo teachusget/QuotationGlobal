@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Industry;
+use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
@@ -49,6 +50,7 @@ class IndustryController extends Controller
             'logo_data' => $data['logo_data'] ?? null,
             'status' => $data['status'],
         ]);
+        Audit::record($request, 'industry.created', $industry, null, $industry->only(['id', 'name', 'slug', 'description', 'status']));
 
         return response()->json([
             'message' => 'Industry added successfully.',
@@ -68,6 +70,7 @@ class IndustryController extends Controller
         if (Industry::whereKeyNot($industry->id)->whereRaw('LOWER(TRIM(name)) = ?', [Str::lower($name)])->exists()) {
             throw ValidationException::withMessages(['name' => ['Industry with this name already exists.']]);
         }
+        $before = $industry->only(['id', 'name', 'slug', 'description', 'status']);
         $industry->update([
             'name' => $name,
             'slug' => $industry->name === $name ? $industry->slug : Str::slug($name).'-'.Str::lower(Str::random(5)),
@@ -75,15 +78,18 @@ class IndustryController extends Controller
             'status' => $data['status'],
             ...(array_key_exists('logo_data', $data) ? ['logo_data' => $data['logo_data']] : []),
         ]);
+        Audit::record($request, 'industry.updated', $industry, $before, $industry->only(['id', 'name', 'slug', 'description', 'status']));
         return response()->json(['message' => 'Industry updated successfully.', 'data' => $this->resource($industry->fresh())]);
     }
 
-    public function destroy(Industry $industry)
+    public function destroy(Request $request, Industry $industry)
     {
         if ($industry->services()->exists() || $industry->legacyServices()->exists()) {
             throw ValidationException::withMessages(['industry' => ['This industry is assigned to services and cannot be deleted. Deactivate it instead.']]);
         }
+        $before = $industry->only(['id', 'name', 'slug', 'description', 'status']);
         $industry->delete();
+        Audit::record($request, 'industry.deleted', $industry, $before);
         return response()->json(['message' => 'Industry deleted successfully.']);
     }
 
