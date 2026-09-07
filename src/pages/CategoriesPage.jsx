@@ -2,7 +2,6 @@ import { FolderTree, ImageIcon, Pencil, Plus, Search, Trash2 } from 'lucide-reac
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Swal from 'sweetalert2'
-import 'sweetalert2/dist/sweetalert2.min.css'
 import { createCategory, deleteCategory, getCategories, updateCategory } from '../api/categories'
 import CategoryModal from '../components/categories/CategoryModal'
 import { TableSkeleton } from '../components/ui'
