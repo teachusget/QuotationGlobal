@@ -73,12 +73,22 @@ class AuthController extends Controller
         $existing = User::where('email', $data['email'])->first();
         if ($existing?->email_verified_at) throw ValidationException::withMessages(['email' => ['This email is already registered.']]);
         $code = (string) random_int(100000, 999999);
-        $user = $existing ?: new User();
-        $user->fill([...$data, 'account_type' => 'buyer', 'email_verification_code' => Hash::make($code), 'email_verification_expires_at' => now()->addMinutes(10)]);
-        $user->save();
-        $user->syncRoles(['Buyer']);
+        $sendVerification = ! $existing?->email_verification_expires_at || $existing->email_verification_expires_at->isPast();
+        if ($existing) {
+            $user = $existing;
+            if ($sendVerification) {
+                $user->update(['email_verification_code' => Hash::make($code), 'email_verification_expires_at' => now()->addMinutes(10)]);
+            }
+        } else {
+            $user = new User();
+            $user->fill([...$data, 'account_type' => 'buyer', 'email_verification_code' => Hash::make($code), 'email_verification_expires_at' => now()->addMinutes(10)]);
+            $user->save();
+            $user->syncRoles(['Buyer']);
+        }
         Audit::record($request, $existing ? 'buyer.registration_resubmitted' : 'buyer.registered', $user, null, $user->only(['id', 'name', 'username', 'email', 'phone', 'company_name', 'city', 'country', 'account_type']), $user);
-        Mail::raw("Your Quotation Global verification code is: {$code}\n\nThis code expires in 10 minutes.", fn ($mail) => $mail->to($user->email)->subject('Verify your Quotation Global account'));
+        if ($sendVerification) {
+            Mail::raw("Your Quotation Global verification code is: {$code}\n\nThis code expires in 10 minutes.", fn ($mail) => $mail->to($user->email)->subject('Verify your Quotation Global account'));
+        }
         return response()->json([
             'message' => 'A verification code was sent to your email.',
             'email' => $user->email,
@@ -90,8 +100,8 @@ class AuthController extends Controller
     public function verifyEmail(Request $request)
     {
         $data = $request->validate(['email' => ['required', 'email'], 'code' => ['required', 'digits:6']]);
-        $user = User::where('email', $data['email'])->firstOrFail();
-        if (! $user->email_verification_code || ! $user->email_verification_expires_at || $user->email_verification_expires_at->isPast() || ! Hash::check($data['code'], $user->email_verification_code)) {
+        $user = User::where('email', $data['email'])->first();
+        if (! $user || ! $user->email_verification_code || ! $user->email_verification_expires_at || $user->email_verification_expires_at->isPast() || ! Hash::check($data['code'], $user->email_verification_code)) {
             throw ValidationException::withMessages(['code' => ['The verification code is invalid or expired.']]);
         }
         $user->update(['email_verified_at' => now(), 'email_verification_code' => null, 'email_verification_expires_at' => null, 'last_login_at' => now()]);
@@ -166,7 +176,7 @@ class AuthController extends Controller
 
         return response()->json([
             'user' => $this->serializeUser($vendorUser),
-            'token' => $vendorUser->createToken('admin-impersonation')->plainTextToken,
+            'token' => $vendorUser->createToken('admin-impersonation', ['*'], now()->addHour())->plainTextToken,
             'impersonated_by' => $request->user()->only(['id', 'name', 'email']),
         ]);
     }
@@ -174,14 +184,17 @@ class AuthController extends Controller
     public function forgotPassword(Request $request)
     {
         $data = $request->validate([
-            'email' => ['required', 'email', 'exists:users,email'],
+            'email' => ['required', 'email'],
         ]);
 
-        $user = User::where('email', $data['email'])->firstOrFail();
-        $token = Password::createToken($user);
-        $user->sendPasswordResetNotification($token);
-        $resetUrl = url('/reset-password/'.$token).'?email='.urlencode($user->email);
-        Audit::record($request, 'account.password_reset_requested', $user);
+        $user = User::where('email', $data['email'])->first();
+        $resetUrl = null;
+        if ($user) {
+            $token = Password::createToken($user);
+            $user->sendPasswordResetNotification($token);
+            $resetUrl = url('/reset-password/'.$token).'?email='.urlencode($user->email);
+            Audit::record($request, 'account.password_reset_requested', $user);
+        }
 
         return response()->json([
             'message' => 'Password reset instructions have been sent.',

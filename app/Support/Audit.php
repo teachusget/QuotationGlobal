@@ -10,8 +10,10 @@ use Illuminate\Http\Request;
 class Audit
 {
     private const SECRET_KEYS = [
-        'password', 'password_confirmation', 'token', 'plain_text_token', 'remember_token',
-        'email_verification_code', 'document_data', 'logo_data', 'image_data',
+        'password', 'password_confirmation', 'current_password', 'new_password',
+        'token', 'plain_text_token', 'access_token', 'refresh_token', 'remember_token',
+        'code', 'otp', 'verification_code', 'email_verification_code', 'secret', 'api_key',
+        'document_data', 'logo_data', 'image_data',
         'attachment_data', 'company_logo_data',
     ];
 

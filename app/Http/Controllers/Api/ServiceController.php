@@ -26,6 +26,8 @@ class ServiceController extends Controller
         if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             $query->where('vendor_id', $vendor->id);
+        } elseif ($request->user()->account_type === 'staff' && ! $request->user()->isSuperAdmin()) {
+            $query->whereIn('vendor_id', $request->user()->assignedVendors()->select('vendors.id'));
         }
 
         return response()->json(['data' => $query->get()]);
@@ -123,10 +125,7 @@ class ServiceController extends Controller
 
     public function destroy(Request $request, Service $service)
     {
-        if ($request->user()->account_type === 'vendor') {
-            $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
-            abort_unless($service->vendor_id === $vendor->id, 403, 'You can only delete your own service plans.');
-        }
+        $this->authorizeServiceOwner($request, $service);
         $before = $this->auditSnapshot($service);
         $service->delete();
         Audit::record($request, 'service.deleted', $service, $before);
@@ -135,10 +134,7 @@ class ServiceController extends Controller
 
     public function update(Request $request, Service $service)
     {
-        if ($request->user()->account_type === 'vendor') {
-            $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
-            abort_unless($service->vendor_id === $vendor->id, 403, 'You can only update your own service plans.');
-        }
+        $this->authorizeServiceOwner($request, $service);
         $data = $request->validate(['monthly_price' => ['required', 'numeric', 'min:0'], 'discount_percent' => ['required', 'numeric', 'min:0', 'max:100']]);
         $before = $this->auditSnapshot($service);
         $months = $service->service_type === 'services' ? ['hourly' => 1 / 720, 'daily' => 1 / 30, 'monthly' => 1, 'annual' => 12][$service->billing_cycle] : ['monthly' => 1, 'quarterly' => 3, 'semi_annual' => 6, 'annual' => 12][$service->billing_cycle];
@@ -237,6 +233,9 @@ class ServiceController extends Controller
         } else {
             abort_unless(!empty($data['vendor_id']), 422, 'Select the vendor for this service.');
             $vendor = Vendor::findOrFail($data['vendor_id']);
+            if (! $request->user()->isSuperAdmin()) {
+                abort_unless($request->user()->assignedVendors()->whereKey($vendor->id)->exists(), 403, 'This vendor is not assigned to you.');
+            }
         }
         abort_unless(Category::whereKey($data['subcategory_id'])->where('parent_id', $data['category_id'])->exists(), 422, 'Selected subcategory does not belong to this category.');
         $this->validateBillingCyclesForType($data);
@@ -300,6 +299,8 @@ class ServiceController extends Controller
         if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
             abort_unless($service->vendor_id === $vendor->id, 403, 'You can only manage your own services.');
+        } elseif ($request->user()->account_type === 'staff' && ! $request->user()->isSuperAdmin()) {
+            abort_unless($request->user()->assignedVendors()->whereKey($service->vendor_id)->exists(), 403, 'This service belongs to a vendor that is not assigned to you.');
         }
     }
 

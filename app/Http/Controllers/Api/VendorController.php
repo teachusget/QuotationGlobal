@@ -154,8 +154,11 @@ class VendorController extends Controller
         ]);
     }
 
-    public function document(Vendor $vendor)
+    public function document(Request $request, Vendor $vendor)
     {
+        abort_if($request->user()->account_type === 'buyer', 403);
+        $this->authorizeVendor($request, $vendor);
+        $this->authorizeAssignedVendor($request, $vendor);
         abort_unless(
             $vendor->document_data
                 && preg_match('#^data:((?:image/(?:png|jpeg|webp))|application/pdf);base64,(.+)$#', $vendor->document_data, $parts),
@@ -164,7 +167,8 @@ class VendorController extends Controller
 
         return response(base64_decode($parts[2]))
             ->header('Content-Type', $parts[1])
-            ->header('Cache-Control', 'private, max-age=3600');
+            ->header('Content-Disposition', 'attachment; filename="vendor-document-'.$vendor->id.'.'.($parts[1] === 'application/pdf' ? 'pdf' : explode('/', $parts[1])[1]).'"')
+            ->header('Cache-Control', 'private, no-store');
     }
 
     public function logo(Vendor $vendor)

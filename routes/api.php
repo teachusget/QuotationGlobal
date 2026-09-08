@@ -119,6 +119,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('vendors/{vendor}/status', [VendorController::class, 'status'])->middleware('permission:vendors.activate|vendors.deactivate');
     Route::delete('vendors/{vendor}', [VendorController::class, 'destroy'])->middleware('permission:vendors.delete');
     Route::post('vendors/{vendor}/impersonate', [AuthController::class, 'impersonateVendor'])->middleware('permission:vendors.impersonate');
+    Route::get('vendors/{vendor}/document', [VendorController::class, 'document'])->middleware('permission:vendors.view');
     Route::get('services', [ServiceController::class, 'index'])->middleware('permission:services.view');
     Route::post('services', [ServiceController::class, 'store'])->middleware('permission:services.create');
     Route::patch('services/{service}', [ServiceController::class, 'update'])->middleware('permission:services.update');
@@ -156,6 +157,5 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::get('categories/{category}/logo', [CategoryController::class, 'logo'])->withoutMiddleware('throttle:api')->middleware('throttle:marketplace-media');
 Route::get('brands/{brand}/logo', [BrandController::class, 'logo'])->withoutMiddleware('throttle:api')->middleware('throttle:marketplace-media');
 Route::get('industries/{industry}/logo', [IndustryController::class, 'logo'])->withoutMiddleware('throttle:api')->middleware('throttle:marketplace-media');
-Route::get('vendors/{vendor}/document', [VendorController::class, 'document'])->withoutMiddleware('throttle:api')->middleware('throttle:marketplace-media');
 Route::get('vendors/{vendor}/logo', [VendorController::class, 'logo'])->withoutMiddleware('throttle:api')->middleware('throttle:marketplace-media');
 Route::get('marketplace/service-images/{serviceImage}', [ServiceController::class, 'marketplaceImage'])->withoutMiddleware('throttle:api')->middleware('throttle:marketplace-media');
