@@ -115,6 +115,9 @@ class SecurityHardeningTest extends TestCase
             ->assertHeader('Content-Security-Policy')
             ->assertHeaderMissing('X-Powered-By');
         $this->assertSame(480, config('sanctum.expiration'));
+
+        $this->app->detectEnvironment(fn () => 'production');
+        $this->get('/')->assertOk()->assertSee('http-equiv="Content-Security-Policy"', false);
     }
 
     public function test_cors_only_allows_configured_frontend_origins(): void

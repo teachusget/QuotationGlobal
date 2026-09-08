@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="{{ csrf_token() }}" />
+    @if (app()->environment('production'))
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; media-src 'self' data: blob:" />
+    @endif
     <title>{{ config('app.name', 'QuotationGlobal') }}</title>
     <style>
         #app-bootstrap{position:fixed;inset:0;display:grid;place-items:center;background:#f7f9fc;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#475569}
