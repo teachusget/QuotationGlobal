@@ -1,9 +1,11 @@
 import { Globe2 } from 'lucide-react'
 import { legacyMarketplaceHeader } from '../../data/legacyMarketplaceShell'
+import useMarketplaceContent from '../../hooks/useMarketplaceContent'
 
 export default function BrandLogo({ compact = false, inverse = false, branding, media }) {
-  const resolvedBranding = branding || legacyMarketplaceHeader
-  const resolvedMedia = media || {}
+  const { content } = useMarketplaceContent()
+  const resolvedBranding = branding || content?.document?.header || legacyMarketplaceHeader
+  const resolvedMedia = media || content?.media || {}
   const logo = resolvedBranding?.logo_media_id && resolvedMedia?.[resolvedBranding.logo_media_id]
   return <div className="flex min-w-0 items-center gap-2.5">
     {logo ? <span className={`${compact ? 'h-11 w-[138px]' : 'h-14 w-[215px]'} block shrink-0 overflow-hidden`}><img src={logo.url} alt={logo.alt_text} className="h-full w-full object-contain object-left"/></span> : <Globe2 className={`h-8 w-8 shrink-0 ${inverse ? 'text-white' : 'text-primary'}`} strokeWidth={1.8}/>}
