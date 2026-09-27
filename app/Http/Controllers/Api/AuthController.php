@@ -51,7 +51,18 @@ class AuthController extends Controller
             ]);
         });
         Audit::record($request, 'vendor.registration_submitted', $vendor, null, $vendor->only(['id', 'user_id', 'registration_type', 'name', 'email', 'phone', 'company_name', 'country', 'city', 'status']), $vendor->user);
-        Mail::raw("Your Quotation Global Solution Provider verification code is: {$code}\n\nThis code expires in 10 minutes.", fn ($mail) => $mail->to($data['email'], $data['name'])->subject('Verify your Solution Provider application'));
+        try {
+            Mail::raw("Your Quotation Global Solution Provider verification code is: {$code}\n\nThis code expires in 10 minutes.", fn ($mail) => $mail->to($data['email'], $data['name'])->subject('Verify your Solution Provider application'));
+        } catch (\Throwable $exception) {
+            Log::error('Unable to send solution provider verification email.', [
+                'email' => $data['email'],
+                'exception' => $exception,
+            ]);
+
+            return response()->json([
+                'message' => 'Your application was saved, but the verification email could not be sent. Please try again shortly.',
+            ], 503);
+        }
         return response()->json(['message' => 'Application received. Verify your email to submit it for approval.', 'email' => $data['email'], 'requires_verification' => true, 'verification_code' => app()->isLocal() ? $code : null], 201);
     }
 
@@ -87,7 +98,18 @@ class AuthController extends Controller
         }
         Audit::record($request, $existing ? 'buyer.registration_resubmitted' : 'buyer.registered', $user, null, $user->only(['id', 'name', 'username', 'email', 'phone', 'company_name', 'city', 'country', 'account_type']), $user);
         if ($sendVerification) {
-            Mail::raw("Your Quotation Global verification code is: {$code}\n\nThis code expires in 10 minutes.", fn ($mail) => $mail->to($user->email)->subject('Verify your Quotation Global account'));
+            try {
+                Mail::raw("Your Quotation Global verification code is: {$code}\n\nThis code expires in 10 minutes.", fn ($mail) => $mail->to($user->email)->subject('Verify your Quotation Global account'));
+            } catch (\Throwable $exception) {
+                Log::error('Unable to send buyer verification email.', [
+                    'email' => $user->email,
+                    'exception' => $exception,
+                ]);
+
+                return response()->json([
+                    'message' => 'Your account was saved, but the verification email could not be sent. Please try again shortly.',
+                ], 503);
+            }
         }
         return response()->json([
             'message' => 'A verification code was sent to your email.',
