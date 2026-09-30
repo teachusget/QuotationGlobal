@@ -29,6 +29,13 @@ export async function getQuoteRequests() {
   return Array.isArray(data.data) ? data.data : []
 }
 
+export async function createAdminRfq(payload) {
+  const response = await fetch('/api/quote-requests', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify(payload) })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.message || Object.values(data.errors || {}).flat()[0] || 'Unable to send RFQ.')
+  return data
+}
+
 async function post(id, action, payload) {
   const response = await fetch(`/api/quote-requests/${id}/${action}`, {
     method: 'POST',

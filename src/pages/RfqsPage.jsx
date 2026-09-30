@@ -1,4 +1,4 @@
-import { Building2, CalendarClock, Check, Download, Eye, FileCheck2, FileText, FileUp, ImageIcon, Mail, PackageSearch, Paperclip, Send, UserRound, X } from 'lucide-react'
+import { Building2, CalendarClock, Check, Download, Eye, FileCheck2, FileText, FileUp, ImageIcon, Mail, PackageSearch, Paperclip, Plus, Send, UserRound, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { downloadBuyerAttachment, generatePurchaseOrder, getBuyerAttachmentPreviewUrl, getQuoteRequests, respondToVendorQuote, sendPurchaseOrder, sendVendorQuote } from '../api/rfqs'
@@ -7,6 +7,8 @@ import CreateQuoteModal from '../components/rfqs/CreateQuoteModal'
 import QuoteDocumentModal from '../components/rfqs/QuoteDocumentModal'
 import PurchaseOrderModal from '../components/rfqs/PurchaseOrderModal'
 import UploadQuoteModal from '../components/rfqs/UploadQuoteModal'
+import AdminRfqModal from '../components/rfqs/AdminRfqModal'
+import { Button } from '../components/ui'
 
 const cycleLabels = { monthly: 'Monthly', quarterly: 'Quarterly', semi_annual: 'Semi-Annual', annual: 'Annual / Yearly' }
 const statusStyles = {
@@ -47,6 +49,7 @@ export default function RfqsPage({ quotationOnly = false }) {
   const [saving, setSaving] = useState(false)
   const [previewRequest, setPreviewRequest] = useState(null)
   const [purchaseOrder, setPurchaseOrder] = useState(null)
+  const [adminRfqOpen, setAdminRfqOpen] = useState(false)
 
   const load = () => getQuoteRequests().then(setRequests).catch((err) => setError(err.message)).finally(() => setLoading(false))
   useEffect(() => { load() }, [])
@@ -75,7 +78,7 @@ export default function RfqsPage({ quotationOnly = false }) {
   const subtitle = quotationOnly ? (isBuyer ? 'Review quotations received from solution providers.' : isVendor ? 'View and manage quotations sent to your customers.' : 'Monitor all vendor quotations and buyer responses.') : isVendor ? 'Review RFQs and send formal quotes to customers.' : isBuyer ? 'Review, accept or decline quotes received from vendors.' : 'Monitor RFQs and vendor quotation progress.'
 
   return <section>
-    <div className="rounded-2xl bg-gradient-to-r from-[#082d66] to-primary px-6 py-7 text-white sm:px-8"><div className="flex flex-wrap items-center justify-between gap-5"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-blue-200"><FileText className="h-4 w-4"/>{quotationOnly ? 'Procurement' : 'RFQ Inbox'}</div><h1 className="mt-2 text-2xl font-bold">{heading}</h1><p className="mt-2 max-w-2xl text-sm text-blue-100">{subtitle}</p></div><div className="rounded-xl border border-white/20 bg-white/10 px-6 py-4 text-center"><p className="text-3xl font-bold">{visible.length}</p><p className="text-[11px] text-blue-100">{quotationOnly ? 'Total Quotations' : 'Total RFQs'}</p></div></div></div>
+    <div className="rounded-2xl bg-gradient-to-r from-[#082d66] to-primary px-6 py-7 text-white sm:px-8"><div className="flex flex-wrap items-center justify-between gap-5"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-blue-200"><FileText className="h-4 w-4"/>{quotationOnly ? 'Procurement' : 'RFQ Inbox'}</div><h1 className="mt-2 text-2xl font-bold">{heading}</h1><p className="mt-2 max-w-2xl text-sm text-blue-100">{subtitle}</p></div><div className="flex items-center gap-4"><div className="rounded-xl border border-white/20 bg-white/10 px-6 py-4 text-center"><p className="text-3xl font-bold">{visible.length}</p><p className="text-[11px] text-blue-100">{quotationOnly ? 'Total Quotations' : 'Total RFQs'}</p></div>{isAdmin && !quotationOnly && <Button type="button" variant="onDark" size="lg" icon={Plus} onClick={() => setAdminRfqOpen(true)}>Add RFQ</Button>}</div></div></div>
     <div className="mt-6 ui-toolbar shadow-subtle"><label className="relative min-w-0 flex-1"><PackageSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search product, customer, vendor or email..." className="h-11 w-full rounded-lg border pl-10 pr-3 text-sm outline-none focus:border-primary"/></label><select aria-label="Filter RFQs by status" value={statusFilter} onChange={(event) => changeStatus(event.target.value)} className="h-11 min-w-44 rounded-lg border bg-white px-3 text-xs font-semibold"><option value="">All statuses</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
     {error && !quoteRequest && <p className="mt-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-600">{error}</p>}
     {loading ? <div className="mt-6 space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-28 ui-skeleton ui-toolbar"><div className="h-full rounded-lg bg-slate-100"/></div>)}</div> : <div className="mt-6 space-y-3">
@@ -100,5 +103,6 @@ export default function RfqsPage({ quotationOnly = false }) {
     {uploadRequest && <UploadQuoteModal request={uploadRequest} saving={saving} error={error} onClose={() => { if (!saving) setUploadRequest(null) }} onSend={(payload) => sendQuote(payload, uploadRequest)}/>}
     {previewRequest && <QuoteDocumentModal request={previewRequest} onClose={() => setPreviewRequest(null)}/>}
     {purchaseOrder && <PurchaseOrderModal order={purchaseOrder} onClose={() => setPurchaseOrder(null)}/>}
+    <AdminRfqModal open={adminRfqOpen} onClose={() => setAdminRfqOpen(false)} onCreated={(items) => setRequests((current) => [...items, ...current])}/>
   </section>
 }

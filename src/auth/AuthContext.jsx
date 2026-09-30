@@ -56,7 +56,7 @@ export function AuthProvider({ children }) {
     setUser(nextUser)
   }, [])
 
-  const can = useCallback((permission) => Boolean(user?.permissions?.includes(permission)), [user])
+  const can = useCallback((permission) => Boolean(user?.roles?.some((role) => role.name === 'Super Admin') || user?.permissions?.includes(permission)), [user])
   const canAny = useCallback((permissions) => permissions.some(can), [can])
   const value = useMemo(() => ({ user, loading, isAuthenticated: Boolean(user), login, register, verifyEmail, logout, refreshUser, updateCurrentUser, can, canAny }), [user, loading, login, register, verifyEmail, logout, refreshUser, updateCurrentUser, can, canAny])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

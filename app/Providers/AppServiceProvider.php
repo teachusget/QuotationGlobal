@@ -15,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::before(fn (User $user) => $user->isSuperAdmin() ? true : null);
         ResetPassword::createUrlUsing(function (object $notifiable, string $token) {
-            return url('/reset-password/'.$token).'?email='.urlencode($notifiable->getEmailForPasswordReset());
+            return rtrim(config('app.frontend_url'), '/').'/reset-password/'.$token.'?email='.urlencode($notifiable->getEmailForPasswordReset());
         });
     }
 }

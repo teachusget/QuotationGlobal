@@ -1,7 +1,7 @@
-import { KeyRound, Mail, MoreHorizontal, Plus, Search, ShieldCheck, UserCog, UsersRound } from 'lucide-react'
+import { KeyRound, Mail, MoreHorizontal, Plus, Search, ShieldCheck, Trash2, UserCog, UsersRound } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import Swal from 'sweetalert2'
-import { createUser, getRoles, getUsers, inviteUser, resetUserPassword, setUserStatus, syncUserRoles, updateUser } from '../api/rbac'
+import { createUser, deleteUser, getRoles, getUsers, inviteUser, resetUserPassword, setUserStatus, syncUserRoles, updateUser } from '../api/rbac'
 import { getVendors } from '../api/vendors'
 import { getBrands } from '../api/brands'
 import { getCategories } from '../api/categories'
@@ -37,7 +37,7 @@ function AssignedSubcategoryDropdown({ items, selected, onToggle, onSelectAll })
 }
 
 export default function UsersPage() {
-  const { can } = useAuth()
+  const { can, user: currentUser } = useAuth()
   const [users, setUsers] = useState([])
   const [roles, setRoles] = useState([])
   const [vendors, setVendors] = useState([])
@@ -110,9 +110,14 @@ export default function UsersPage() {
     if (!confirmation.isConfirmed) return
     try { await setUserStatus(user.id, activating); await load(true) } catch (requestError) { await Swal.fire('Action failed', requestError.message, 'error') }
   }
+  const remove = async (user) => {
+    const confirmation = await Swal.fire({ title: `Permanently delete ${user.name}?`, text: 'This permanently removes the account and its account-owned data. The same email can be registered again afterward.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Permanently delete', confirmButtonColor: '#dc2626' })
+    if (!confirmation.isConfirmed) return
+    try { await deleteUser(user.id); await load(true); await Swal.fire({ icon: 'success', title: 'User deleted.', timer: 1200, showConfirmButton: false }) } catch (requestError) { await Swal.fire('Action failed', requestError.message, 'error') }
+  }
   const emailAction = async (user, type) => { try { const result = type === 'invite' ? await inviteUser(user.id) : await resetUserPassword(user.id); await Swal.fire({ icon: 'success', title: result.message, timer: 1400, showConfirmButton: false }) } catch (requestError) { await Swal.fire('Action failed', requestError.message, 'error') } }
 
-  const actions = (user) => <div className="relative flex justify-end"><IconButton label={`Actions for ${user.name}`} onClick={() => setActionMenu(actionMenu === user.id ? null : user.id)}><MoreHorizontal className="h-4 w-4"/></IconButton>{actionMenu === user.id && <div className="absolute right-0 top-11 z-20 w-48 overflow-hidden rounded-lg border bg-white py-1 shadow-floating">{can('users.update') && <button type="button" onClick={() => { setActionMenu(null); openEditor(user) }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50"><UserCog className="h-4 w-4"/>Edit user</button>}{can(user.is_blocked ? 'users.activate' : 'users.deactivate') && <button type="button" onClick={() => { setActionMenu(null); status(user) }} className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50 ${user.is_blocked ? 'text-emerald-700' : 'text-red-600'}`}><ShieldCheck className="h-4 w-4"/>{user.is_blocked ? 'Activate user' : 'Deactivate user'}</button>}{can('users.send_invite') && <button type="button" onClick={() => { setActionMenu(null); emailAction(user, 'invite') }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50"><Mail className="h-4 w-4"/>Send invitation</button>}{can('users.reset_password') && <button type="button" onClick={() => { setActionMenu(null); emailAction(user, 'reset') }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50"><KeyRound className="h-4 w-4"/>Reset password</button>}</div>}</div>
+  const actions = (user) => <div className="relative flex justify-end"><IconButton label={`Actions for ${user.name}`} onClick={() => setActionMenu(actionMenu === user.id ? null : user.id)}><MoreHorizontal className="h-4 w-4"/></IconButton>{actionMenu === user.id && <div className="absolute right-0 top-11 z-20 w-48 overflow-hidden rounded-lg border bg-white py-1 shadow-floating">{can('users.update') && <button type="button" onClick={() => { setActionMenu(null); openEditor(user) }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50"><UserCog className="h-4 w-4"/>Edit user</button>}{can(user.is_blocked ? 'users.activate' : 'users.deactivate') && <button type="button" onClick={() => { setActionMenu(null); status(user) }} className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50 ${user.is_blocked ? 'text-emerald-700' : 'text-red-600'}`}><ShieldCheck className="h-4 w-4"/>{user.is_blocked ? 'Activate user' : 'Deactivate user'}</button>}{can('users.send_invite') && <button type="button" onClick={() => { setActionMenu(null); emailAction(user, 'invite') }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50"><Mail className="h-4 w-4"/>Send invitation</button>}{can('users.reset_password') && <button type="button" onClick={() => { setActionMenu(null); emailAction(user, 'reset') }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-slate-50"><KeyRound className="h-4 w-4"/>Reset password</button>}{can('users.delete') && user.id !== currentUser?.id && <button type="button" onClick={() => { setActionMenu(null); remove(user) }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-red-600 hover:bg-red-50"><Trash2 className="h-4 w-4"/>Delete user</button>}</div>}</div>
 
   const columns = [{ key: 'user', label: 'User' }, { key: 'type', label: 'Type' }, { key: 'roles', label: 'Roles' }, { key: 'status', label: 'Status' }, { key: 'login', label: 'Last login' }, { key: 'actions', label: 'Actions', className: 'text-right' }]
   const cell = (user, column) => ({

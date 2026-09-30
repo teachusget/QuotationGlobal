@@ -301,6 +301,8 @@ class DemoRequestController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($request->user()->account_type === 'buyer', 403, 'Only buyers can submit demo or quote requests.');
+
         $data = $request->validate([
             'service_id' => ['required', 'integer', 'exists:services,id'],
             'request_type' => ['required', Rule::in(['demo', 'quote'])],
@@ -332,6 +334,39 @@ class DemoRequestController extends Controller
         Audit::record($request, $requestRow->wasRecentlyCreated ? $data['request_type'].'.requested' : $data['request_type'].'.request_updated', $requestRow, $existingBefore, $requestRow->only(['id', 'service_id', 'user_id', 'vendor_id', 'request_type', 'demo_at', 'quote_purpose', 'expected_users', 'currently_using', 'current_brand_name', 'status']));
 
         return response()->json(['message' => $data['request_type'] === 'demo' ? 'Demo request sent to the Solution Provider.' : 'Quote request sent successfully.', 'data' => $requestRow], $requestRow->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function createAdminQuote(Request $request)
+    {
+        abort_unless(! in_array($request->user()->account_type, ['buyer', 'vendor'], true), 403, 'Only an admin can create RFQs.');
+
+        $data = $request->validate([
+            'targets' => ['required', 'array', 'min:1', 'max:50'],
+            'targets.*.service_id' => ['required', 'integer', 'exists:services,id'],
+            'targets.*.vendor_id' => ['required', 'integer', 'distinct', Rule::exists('vendors', 'id')->where(fn ($query) => $query->where('status', 'approved'))],
+            'user_id' => ['required', 'integer', Rule::exists('users', 'id')->where(fn ($query) => $query->where('account_type', 'buyer')->where('is_blocked', false)->whereNull('deleted_at'))],
+            'quote_purpose' => ['required', 'string', 'min:10', 'max:1500'],
+            'expected_users' => ['required', 'integer', 'min:1', 'max:1000000'],
+            'currently_using' => ['required', Rule::in(['manual', 'spreadsheet', 'customized_in_house', 'brand'])],
+            'current_brand_name' => ['nullable', 'required_if:currently_using,brand', 'string', 'max:150'],
+        ]);
+        $campaignId = (string) Str::uuid();
+        $requests = DB::transaction(function () use ($data, $campaignId, $request) {
+            return collect($data['targets'])->map(function (array $target) use ($data, $campaignId, $request) {
+            $vendor = Vendor::whereKey($target['vendor_id'])->where('status', 'approved')->whereHas('user')->firstOrFail();
+            $service = Service::whereKey($target['service_id'])->where('vendor_id', $vendor->id)->firstOrFail();
+            $requestRow = DemoRequest::create([
+                'rfq_campaign_id' => $campaignId, 'service_id' => $service->id, 'vendor_id' => $vendor->id, 'user_id' => $data['user_id'], 'request_type' => 'quote',
+                'quote_purpose' => trim($data['quote_purpose']), 'expected_users' => $data['expected_users'], 'currently_using' => $data['currently_using'],
+                'current_brand_name' => $data['currently_using'] === 'brand' ? trim((string) ($data['current_brand_name'] ?? '')) : null, 'status' => 'pending',
+            ]);
+            $requestRow->load(['service:id,name', 'vendor:id,company_name,name,email', 'user:id,name,email']);
+            $this->sendQuoteEmails($requestRow, 'quote_requested');
+            Audit::record($request, 'quote.requested_by_admin', $requestRow, null, $requestRow->only(['id', 'rfq_campaign_id', 'service_id', 'vendor_id', 'user_id', 'request_type', 'status']));
+                return $requestRow;
+            });
+        });
+        return response()->json(['message' => $requests->count().' RFQs sent to vendors.', 'data' => $requests->values()], 201);
     }
 
     private function sendQuoteEmails(DemoRequest $quote, string $event): void

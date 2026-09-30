@@ -56,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('users', [UserController::class, 'store'])->middleware('permission:users.create');
     Route::get('users/{user}', [UserController::class, 'show'])->middleware('permission:users.view');
     Route::put('users/{user}', [UserController::class, 'update'])->middleware('permission:users.update');
+    Route::delete('users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.delete');
     Route::patch('users/{user}/roles', [UserController::class, 'syncRoles'])->middleware('permission:users.assign_roles');
     Route::patch('users/{user}/status', [UserController::class, 'status'])->middleware('permission:users.activate|users.deactivate');
     Route::post('users/{user}/invite', [UserController::class, 'invite'])->middleware('permission:users.send_invite');
@@ -133,6 +134,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('demo-requests/{demoRequest}/moderation', [DemoRequestController::class, 'moderate'])->middleware('permission:demos.moderate');
     Route::patch('purchase-orders/{purchaseOrder}/assign-vendor', [DemoRequestController::class, 'assignPurchaseOrderVendor'])->middleware('permission:purchase_orders.assign_vendor');
     Route::post('demo-requests', [DemoRequestController::class, 'store']);
+    Route::post('quote-requests', [DemoRequestController::class, 'createAdminQuote'])->middleware('permission:rfqs.create');
     Route::post('marketplace/services/{service}/ratings', [ServiceController::class, 'rate']);
     Route::get('demo-requests', [DemoRequestController::class, 'index'])->middleware('permission:demos.view');
     Route::get('quote-requests', [DemoRequestController::class, 'quoteIndex'])->middleware('permission:rfqs.view');

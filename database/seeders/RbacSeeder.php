@@ -11,12 +11,12 @@ use Spatie\Permission\PermissionRegistrar;
 class RbacSeeder extends Seeder
 {
     public const PERMISSIONS = [
-        'users.view','users.create','users.update','users.activate','users.deactivate','users.assign_roles','users.send_invite','users.reset_password',
+        'users.view','users.create','users.update','users.delete','users.activate','users.deactivate','users.assign_roles','users.send_invite','users.reset_password',
         'roles.view','roles.create','roles.update','roles.delete','roles.assign','roles.manage_permissions','audit_logs.view',
         'vendors.view','vendors.create','vendors.update','vendors.approve','vendors.activate','vendors.deactivate','vendors.delete','vendors.impersonate','customers.view','customers.update','customers.assign','customers.follow_up','customers.block','customers.unblock',
         'categories.view','categories.create','categories.update','categories.delete','brands.view','brands.create','brands.update','brands.delete','brands.approve',
         'industries.view','industries.create','industries.update','industries.delete','services.view','services.create','services.update','services.delete',
-        'specifications.view','specifications.create','specifications.update','specifications.delete','rfqs.view','rfqs.update','rfqs.quote','rfqs.respond',
+        'specifications.view','specifications.create','specifications.update','specifications.delete','rfqs.view','rfqs.create','rfqs.update','rfqs.quote','rfqs.respond',
         'demos.view','demos.update','demos.moderate','messages.view','messages.send','purchase_orders.view','purchase_orders.create','purchase_orders.assign_vendor','purchase_orders.send',
         'marketplace_builder.view','marketplace_builder.update','marketplace_builder.publish','marketplace_builder.manage_media',
         'settings.manage',
