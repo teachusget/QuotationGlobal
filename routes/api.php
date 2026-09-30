@@ -56,6 +56,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('users', [UserController::class, 'store'])->middleware('permission:users.create');
     Route::get('users/{user}', [UserController::class, 'show'])->middleware('permission:users.view');
     Route::put('users/{user}', [UserController::class, 'update'])->middleware('permission:users.update');
+    Route::patch('users/{user}/password', [UserController::class, 'updatePassword'])->middleware('permission:users.update');
     Route::delete('users/{user}', [UserController::class, 'destroy'])->middleware('permission:users.delete');
     Route::patch('users/{user}/roles', [UserController::class, 'syncRoles'])->middleware('permission:users.assign_roles');
     Route::patch('users/{user}/status', [UserController::class, 'status'])->middleware('permission:users.activate|users.deactivate');
