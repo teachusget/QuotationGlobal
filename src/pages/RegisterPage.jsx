@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
+  BriefcaseBusiness,
   Eye,
   EyeOff,
   ImagePlus,
@@ -11,6 +12,7 @@ import {
   Mail,
   MapPin,
   UserRound,
+  UsersRound,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
@@ -71,6 +73,7 @@ export default function RegisterPage() {
   const [logoName, setLogoName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [accountType, setAccountType] = useState("buyer");
   const dirty = JSON.stringify(form) !== JSON.stringify(initialForm);
   useEffect(() => {
     if (!dirty) return undefined;
@@ -83,6 +86,7 @@ export default function RegisterPage() {
   }, [dirty]);
 
   if (isAuthenticated) return <Navigate to="/" replace />;
+
 
   const change = (event) => {
     setForm((current) => ({
@@ -161,10 +165,15 @@ export default function RegisterPage() {
         <div className="my-auto w-full max-w-[610px]">
           <BrandLogo />
           <div className="mt-6">
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-primary">
-              <UserRound className="h-3.5 w-3.5" />
-              Buyer registration
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                <UserRound className="h-3.5 w-3.5" />
+                Buyer registration
+              </span>
+              <button type="button" onClick={() => window.location.assign("/register")} className="inline-flex cursor-pointer items-center rounded-md border border-blue-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-primary shadow-sm transition hover:border-primary hover:bg-blue-50">
+                Change account type
+              </button>
+            </div>
             <h1 className="mt-3 text-2xl font-bold text-slate-900">
               {verificationEmail ? "Verify your email" : "Create your account"}
             </h1>

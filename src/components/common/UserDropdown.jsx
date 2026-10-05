@@ -29,7 +29,7 @@ export default function UserDropdown() {
   const initials = (user?.name || 'User').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
   const go = (path) => { setOpen(false); setRequestsOpen(false); navigate(path) }
 
-  return <>{!isBuyer && <PortalActivityActions isAdmin={isAdmin}/>}<div className="relative" ref={root}>
+  return <><PortalActivityActions isAdmin={isAdmin}/><div className="relative" ref={root}>
     <button type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-haspopup="menu" aria-label="Open account menu" className="flex items-center gap-2 rounded-md p-1 text-left hover:bg-slate-50">
       <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-slate-200 text-xs font-bold text-slate-600">{user?.company_logo_data ? <img src={user.company_logo_data} alt="" className="h-full w-full object-cover"/> : initials}</span>
       <span className="hidden min-w-0 leading-tight xl:block"><span className="block max-w-32 truncate text-xs font-semibold">{user?.name}</span><span className="block max-w-32 truncate text-[11px] capitalize text-slate-500">{user?.company_name || user?.account_type}</span></span>

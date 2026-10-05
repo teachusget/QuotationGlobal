@@ -174,6 +174,19 @@ class ServiceController extends Controller
                 return $plan->load(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'industries:id,name', 'brands:id,name']);
             });
         });
+        // Add newly selected images during an edit as well. Existing images
+        // remain intact; the client sends only newly selected files.
+        $images = array_values(array_filter([...($data['image_datas'] ?? []), $data['image_data'] ?? null]));
+        if ($images) {
+            $lastOrder = (int) ServiceImage::whereIn('service_id', $services->pluck('id'))
+                ->max('sort_order');
+            foreach ($images as $offset => $image) {
+                $services->first()->images()->create([
+                    'image_data' => $image,
+                    'sort_order' => $lastOrder + $offset + 1,
+                ]);
+            }
+        }
         Audit::record($request, 'service.product_updated', $service, ['plans' => $before], ['plans' => $services->map(fn ($plan) => $this->auditSnapshot($plan))->all()]);
 
         return response()->json(['message' => 'Complete service updated successfully.', 'data' => $services]);

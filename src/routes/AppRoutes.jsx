@@ -19,6 +19,7 @@ const BrandsPage = lazy(() => import('../pages/BrandsPage'))
 const IndustriesPage = lazy(() => import('../pages/IndustriesPage'))
 const VendorsPage = lazy(() => import('../pages/VendorsPage'))
 const RegisterPage = lazy(() => import('../pages/RegisterPage'))
+const RegisterEntryPage = lazy(() => import('../pages/RegisterEntryPage'))
 const SolutionProviderRegisterPage = lazy(() => import('../pages/SolutionProviderRegisterPage'))
 const ForgotPasswordPage = lazy(() => import('../pages/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('../pages/ResetPasswordPage'))
@@ -48,6 +49,8 @@ const BrowseSolutionsPage = lazy(() => import('../pages/BrowseSolutionsPage'))
 const MarketplaceBrandsPage = lazy(() => import('../pages/MarketplaceBrandsPage'))
 const MarketplaceIndustriesPage = lazy(() => import('../pages/MarketplaceIndustriesPage'))
 const SellingCountriesPage = lazy(() => import('../pages/SellingCountriesPage'))
+const AdvicePage = lazy(() => import('../pages/AdvicePage'))
+const ContactPage = lazy(() => import('../pages/ContactPage'))
 
 export default function AppRoutes() {
   const { user } = useAuth()
@@ -55,12 +58,13 @@ export default function AppRoutes() {
   const isBuyer = user?.account_type === 'buyer'
   const isAdmin = !isVendor && !isBuyer
   const categoryPaths = ['/categories', '/sub-categories']
-  const implementedPaths = ['/', '/brands', '/industries', '/vendors', '/customers', '/services', '/marketplace', '/rfqs', '/compare', '/specification-templates', '/selling-countries', '/featured-banner-ads', ...categoryPaths]
+  const implementedPaths = ['/', '/brands', '/industries', '/vendors', '/customers', '/services', '/marketplace', '/rfqs', '/advice', '/advice-requests', '/compare', '/specification-templates', '/selling-countries', '/featured-banner-ads', ...categoryPaths]
   const placeholderItems = allNavigation.filter((item) => item.path !== '/rfqs' && !implementedPaths.includes(item.path))
 
   return <Suspense fallback={<div className="mx-auto min-h-96 w-full max-w-[1440px] animate-pulse rounded-xl bg-slate-100"/>}><Routes>
     <Route path="/login" element={<LoginPage/>}/>
-    <Route path="/register" element={<RegisterPage/>}/>
+    <Route path="/register" element={<RegisterEntryPage/>}/>
+    <Route path="/register/buyer" element={<RegisterPage/>}/>
     <Route path="/solution-provider/register" element={<SolutionProviderRegisterPage/>}/>
     <Route path="/forgot-password" element={<ForgotPasswordPage/>}/>
     <Route path="/reset-password/:token" element={<ResetPasswordPage/>}/>
@@ -74,6 +78,7 @@ export default function AppRoutes() {
       <Route path="/marketplace/services/:id" element={<ProductPage/>}/>
       <Route path="/marketplace/type/:type" element={<ServiceTypePage/>}/>
       <Route path="/compare" element={<ComparePage/>}/>
+      <Route path="/contact" element={<ContactPage/>}/>
     </Route>
     <Route element={<ProtectedRoute/>}>
       <Route element={<AppLayout/>}>
@@ -91,6 +96,8 @@ export default function AppRoutes() {
         <Route path="/roles" element={<PermissionRoute permission="roles.view"><RolesPage/></PermissionRoute>}/>
         <Route path="/audit-logs" element={<PermissionRoute permission="audit_logs.view"><AuditLogsPage/></PermissionRoute>}/>
         <Route path="/demos" element={<PermissionRoute permission="demos.view"><DemosPage/></PermissionRoute>}/>
+        <Route path="/advice" element={<AdvicePage/>}/>
+        <Route path="/advice-requests" element={<AdvicePage/>}/>
         <Route path="/rfqs" element={<PermissionRoute permission="rfqs.view"><RfqsPage/></PermissionRoute>}/>
         <Route path="/quotations" element={<PermissionRoute permission="rfqs.view"><QuotationsPage/></PermissionRoute>}/>
         <Route path="/purchase-orders" element={<PermissionRoute permission="purchase_orders.view"><VendorPurchaseOrdersPage/></PermissionRoute>}/>

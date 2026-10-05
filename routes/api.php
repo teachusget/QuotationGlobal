@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\MarketplaceTemplateController;
 use App\Http\Controllers\Api\SellingCountryController;
 use App\Http\Controllers\Api\UserNotificationStateController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\AdviceRequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:authentication');
@@ -44,6 +45,12 @@ Route::get('specifications', [SpecificationController::class, 'index']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index']);
+    Route::get('advice-requests', [AdviceRequestController::class, 'index']);
+    Route::post('advice-requests', [AdviceRequestController::class, 'store']);
+    Route::patch('advice-requests/{adviceRequest}', [AdviceRequestController::class, 'update']);
+    Route::get('advice-requests/{adviceRequest}/attachment', [AdviceRequestController::class, 'downloadAttachment']);
+    Route::get('advice-requests/{adviceRequest}/messages', [AdviceRequestController::class, 'messages']);
+    Route::post('advice-requests/{adviceRequest}/messages', [AdviceRequestController::class, 'sendMessage']);
     Route::get('notification-states', [UserNotificationStateController::class, 'index']);
     Route::post('notification-states/read', [UserNotificationStateController::class, 'markRead']);
     Route::post('notification-states/clear', [UserNotificationStateController::class, 'clear']);

@@ -5,7 +5,7 @@ export const primaryNavigation = [
   { label: 'Brands', path: '/brands', icon: Award, highlighted: true }, { label: 'Solutions / Services', path: '/services', icon: Cloud, highlighted: true },
   { label: 'Specification Templates', path: '/specification-templates', icon: ListChecks },
   { label: 'Vendors', path: '/vendors', icon: UserRound }, { label: 'Customers', path: '/customers', icon: UsersRound }, { label: 'Compare', path: '/compare', icon: Columns3 },
-  { label: 'RFQs', path: '/rfqs', icon: FileText }, { label: 'Demos', path: '/demos', icon: PlaySquare },
+  { label: 'RFQs', path: '/rfqs', icon: FileText }, { label: 'Demos', path: '/demos', icon: PlaySquare }, { label: 'Advice Requests', path: '/advice-requests', icon: Mail },
   { label: 'Industries', path: '/industries', icon: BarChart3 }, { label: 'Inventory', path: '/inventory', icon: Boxes }, { label: 'Pricing', path: '/pricing', icon: ShoppingCart },
   { label: 'Marketplace', path: '/marketplace', icon: Boxes }, { label: 'Users', path: '/users', icon: UserCog, permission: 'users.view' },
   { label: 'Roles & Permissions', path: '/roles', icon: Shield, permission: 'roles.view' }, { label: 'Audit Log', path: '/audit-logs', icon: ClipboardList, permission: 'audit_logs.view' },

@@ -59,9 +59,10 @@ class AuthController extends Controller
                 'exception' => $exception,
             ]);
 
-            return response()->json([
-                'message' => 'Your application was saved, but the verification email could not be sent. Please try again shortly.',
-            ], 503);
+            if (app()->isLocal()) {
+                return response()->json(['message' => 'Application saved. Local verification code is available below.', 'email' => $data['email'], 'requires_verification' => true, 'verification_code' => $code], 201);
+            }
+            return response()->json(['message' => 'Your application was saved, but the verification email could not be sent. Please try again shortly.'], 503);
         }
         return response()->json(['message' => 'Application received. Verify your email to submit it for approval.', 'email' => $data['email'], 'requires_verification' => true, 'verification_code' => app()->isLocal() ? $code : null], 201);
     }
@@ -84,7 +85,8 @@ class AuthController extends Controller
         $existing = User::where('email', $data['email'])->first();
         if ($existing?->email_verified_at) throw ValidationException::withMessages(['email' => ['This email is already registered.']]);
         $code = (string) random_int(100000, 999999);
-        $sendVerification = ! $existing?->email_verification_expires_at || $existing->email_verification_expires_at->isPast();
+        // Local SMTP is often intentionally unset; always refresh the code locally so a failed send can be retried.
+        $sendVerification = app()->isLocal() || ! $existing?->email_verification_expires_at || $existing->email_verification_expires_at->isPast();
         if ($existing) {
             $user = $existing;
             if ($sendVerification) {
@@ -106,9 +108,10 @@ class AuthController extends Controller
                     'exception' => $exception,
                 ]);
 
-                return response()->json([
-                    'message' => 'Your account was saved, but the verification email could not be sent. Please try again shortly.',
-                ], 503);
+                if (app()->isLocal()) {
+                    return response()->json(['message' => 'Account saved. Local verification code is available below.', 'email' => $user->email, 'requires_verification' => true, 'verification_code' => $code], 201);
+                }
+                return response()->json(['message' => 'Your account was saved, but the verification email could not be sent. Please try again shortly.'], 503);
             }
         }
         return response()->json([

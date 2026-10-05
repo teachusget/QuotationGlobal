@@ -220,9 +220,15 @@ function GlobalSellingEditor() {
   const [loadError, setLoadError] = useState('')
   useEffect(() => { getSellingCountries().then((result) => setAllowedCountries(result.data.allowed_countries)).catch((error) => setLoadError(error.message)) }, [])
   useEffect(() => {
-    const load = (event) => setSelectedCountries(event.detail.selling_countries || [])
+    const load = (event) => {
+      const countries = event.detail.selling_countries || []
+      setSelectedCountries(countries)
+      // Keep the form payload in sync with the value shown by the selector.
+      // The editor is a child component, so only updating its local state
+      // would make the UI look correct while the API still receives [].
+      window.dispatchEvent(new CustomEvent('service-selling-changed', { detail: { sell_globally: true, selling_countries: countries } }))
+    }
     window.addEventListener('service-selling-editor-value', load)
-    window.dispatchEvent(new CustomEvent('service-selling-changed', { detail: { sell_globally: true, selling_countries: [] } }))
     return () => window.removeEventListener('service-selling-editor-value', load)
   }, [])
   const selectCountries = (countries) => {
