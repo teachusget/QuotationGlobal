@@ -17,6 +17,31 @@ const servicePlans = [{ value: 'hourly', label: 'Hourly', months: 1 / 720 }, { v
 let pricingServiceType = ''
 const plans = { map: (callback) => (pricingServiceType === 'hardware' ? [] : pricingServiceType === 'services' ? servicePlans : subscriptionPlans).map(callback) }
 const blank = { vendor_id: '', name: '', sku: '', inventory_quantity: '', low_stock_threshold: 5, track_inventory: true, features: '', certificates: [], specifications: {}, service_type: '', deployment: '', ai_enabled: '', sell_globally: '', selling_countries: [], pricing_mode: 'starting_price', category_id: '', subcategory_id: '', industry_ids: [], brand_id: '', monthly_price: '', billing_cycles: [], discounts: {} }
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
+
+function prepareUpload(file) {
+  if (file.size <= MAX_UPLOAD_BYTES || !file.type.startsWith('image/')) return Promise.resolve(file)
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    const sourceUrl = URL.createObjectURL(file)
+    image.onload = async () => {
+      URL.revokeObjectURL(sourceUrl)
+      let width = image.naturalWidth; let height = image.naturalHeight; let quality = 0.92
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height
+        canvas.getContext('2d').drawImage(image, 0, 0, width, height)
+        const blob = await new Promise((done) => canvas.toBlob(done, 'image/webp', quality))
+        if (blob && blob.size <= MAX_UPLOAD_BYTES) { resolve(new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.webp`, { type: 'image/webp', lastModified: Date.now() })); return }
+        quality -= 0.08
+        if (attempt >= 3) { width = Math.round(width * 0.85); height = Math.round(height * 0.85) }
+      }
+      reject(new Error(`${file.name} could not be compressed below 5 MB without excessive quality loss.`))
+    }
+    image.onerror = () => { URL.revokeObjectURL(sourceUrl); reject(new Error(`Unable to read ${file.name}.`)) }
+    image.src = sourceUrl
+  })
+}
 
 export default function ServicesPage() {
   const { user } = useAuth()
@@ -160,13 +185,17 @@ function Text({ label, value, onChange, required, type = 'text', wide }) {
   const [previews, setPreviews] = useState([])
   const [serviceType, setServiceType] = useState(pricingServiceType)
   useEffect(() => { const changed = (event) => setServiceType(event.detail); window.addEventListener('service-type-changed', changed); return () => window.removeEventListener('service-type-changed', changed) }, [])
-  const selectImages = (event) => {
+  const selectImages = async (event) => {
     const added = [...event.target.files]
-    if (added.some((file) => file.size >= 1024 * 1024)) { window.alert('Each service image must be smaller than 1 MB.'); event.target.value = ''; return }
-    const files = [...previews.map((image) => image.file), ...added].slice(0, 8)
-    setPreviews(files.map((file) => ({ file, name: file.name, url: URL.createObjectURL(file) })))
-    window.dispatchEvent(new CustomEvent('service-images-selected', { detail: added }))
     event.target.value = ''
+    if (!added.length) return
+    if (added.some((file) => !['image/png', 'image/jpeg', 'image/webp'].includes(file.type))) { window.alert('Use PNG, JPG or WebP images only.'); return }
+    try {
+      const compressed = await Promise.all(added.map(prepareUpload))
+      const files = [...previews.map((image) => image.file), ...compressed].slice(0, 8)
+      setPreviews(files.map((file) => ({ file, name: file.name, url: URL.createObjectURL(file) })))
+      window.dispatchEvent(new CustomEvent('service-images-selected', { detail: compressed }))
+    } catch (error) { window.alert(error.message) }
   }
   const isHardwarePrice = serviceType === 'hardware' && (label === 'Fixed Monthly Price (USD)' || label === 'Flexible Starting Price (USD)')
   const shownLabel = isHardwarePrice
@@ -199,8 +228,8 @@ function CertificateUpload() {
     event.target.value = ''
     if (!files.length) return
     if (files.some((file) => !['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(file.type))) return setUploadError('Use PDF, JPG, PNG or WebP certificates only.')
-    if (files.some((file) => file.size >= 1024 * 1024)) return setUploadError('Each certificate must be smaller than 1 MB.')
-    Promise.all(files.map((file) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve({ name: file.name, data: reader.result }); reader.onerror = reject; reader.readAsDataURL(file) }))).then((added) => { publish([...certificates, ...added]); setUploadError('') }).catch(() => setUploadError('Unable to read the selected certificate.'))
+    if (files.some((file) => file.size > MAX_DOCUMENT_BYTES && !file.type.startsWith('image/'))) return setUploadError('PDF certificates must be 10 MB or smaller.')
+    Promise.all(files.map(prepareUpload)).then((prepared) => Promise.all(prepared.map((file) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve({ name: file.name, data: reader.result }); reader.onerror = reject; reader.readAsDataURL(file) })))).then((added) => { publish([...certificates, ...added]); setUploadError('') }).catch((error) => setUploadError(error.message || 'Unable to read the selected certificate.'))
   }
   const remove = (index) => { publish(certificates.filter((_, itemIndex) => itemIndex !== index)); setUploadError('') }
   if (true) return <div className="mb-4"><p className="text-xs font-semibold">Service Certificates <span className="font-normal text-slate-400">(optional)</span></p>{certificates.map((certificate, index) => <div key={`${certificate.name}-${index}`} className="mt-1.5 flex items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 p-2.5"><FileCheck2 className="h-4 w-4 shrink-0 text-emerald-600"/><span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-700">{certificate.name}</span><button type="button" onClick={() => remove(index)} className="rounded p-1.5 text-red-500 hover:bg-red-100" aria-label={`Remove ${certificate.name}`}><Trash2 className="h-4 w-4"/></button></div>)}<label className="mt-1.5 flex h-11 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed bg-slate-50 text-xs font-semibold text-primary hover:border-primary hover:bg-blue-50"><Upload className="h-4 w-4"/>{certificates.length ? 'Add more certificates' : 'Upload certificates'}<input multiple type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={choose} className="sr-only"/></label>{uploadError && <p className="mt-1 text-[11px] text-red-600">{uploadError}</p>}<p className="mt-1 text-[10px] text-slate-400">PDF, JPG, PNG or WebP · Each file must be smaller than 1 MB</p></div>

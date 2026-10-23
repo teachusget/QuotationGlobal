@@ -137,6 +137,39 @@ class AuthController extends Controller
         return response()->json($this->authenticationResponse($user));
     }
 
+    public function resendVerification(Request $request)
+    {
+        $data = $request->validate(['email' => ['required', 'email']]);
+        $user = User::where('email', $data['email'])->first();
+
+        if (! $user || $user->email_verified_at) {
+            return response()->json(['message' => 'If this email needs verification, a new code has been sent.']);
+        }
+
+        $code = (string) random_int(100000, 999999);
+        $user->update([
+            'email_verification_code' => Hash::make($code),
+            'email_verification_expires_at' => now()->addMinutes(10),
+        ]);
+
+        try {
+            $subject = $user->account_type === 'vendor'
+                ? 'Verify your Solution Provider application'
+                : 'Verify your Quotation Global account';
+            Mail::raw("Your Quotation Global verification code is: {$code}\n\nThis code expires in 10 minutes.", fn ($mail) => $mail->to($user->email, $user->name)->subject($subject));
+        } catch (\Throwable $exception) {
+            Log::error('Unable to resend verification email.', ['email' => $user->email, 'exception' => $exception]);
+            if (! app()->isLocal()) {
+                return response()->json(['message' => 'The verification email could not be sent. Please try again shortly.'], 503);
+            }
+        }
+
+        return response()->json([
+            'message' => 'A new verification code has been sent.',
+            'verification_code' => app()->isLocal() ? $code : null,
+        ]);
+    }
+
     public function login(Request $request)
     {
         $credentials = $request->validate([

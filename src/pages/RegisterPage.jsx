@@ -21,6 +21,7 @@ import CountrySelect from "../components/common/CountrySelect";
 import PhoneCountryField from "../components/common/PhoneCountryField";
 import { useAuth } from "../auth/useAuth";
 import { Button, FieldError } from "../components/ui";
+import { resendVerificationCode } from "../api/auth";
 
 const initialForm = {
   name: "",
@@ -150,7 +151,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     setError("");
     try {
-      const result = await register(form);
+      const result = await resendVerificationCode(verificationEmail);
       setLocalCode(result.verification_code || "");
     } catch (requestError) {
       setError(requestError.message);

@@ -1,6 +1,7 @@
-import { ChevronDown, Search, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ChevronDown, Eye, EyeOff, MapPin, Search, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import useDialogAccessibility from '../../hooks/useDialogAccessibility'
+import { countryCatalog } from '../../data/countryCatalog'
 
 const typeLabels = {
   freelancer: 'Freelancer',
@@ -51,6 +52,7 @@ const countryCities = {
 }
 
 const countries = Object.keys(countryCities)
+const countryByName = Object.fromEntries(countryCatalog.map((country) => [country.name, country]))
 
 function Field({ label, name, value, onChange, type = 'text', required = false, placeholder = '' }) {
   return <div>
@@ -59,28 +61,73 @@ function Field({ label, name, value, onChange, type = 'text', required = false, 
   </div>
 }
 
-function SearchableSelect({ label, name, value, options, onChange, required = false, disabled = false, placeholder = 'Select' }) {
+function PasswordField({ label, name, value, onChange, required = false, visible, onToggle }) {
+  return <div>
+    <label htmlFor={`vendor-${name}`} className="mb-1.5 block text-xs font-semibold text-slate-700">{label}{required && <span className="text-red-500"> *</span>}</label>
+    <div className="relative">
+      <input id={`vendor-${name}`} name={name} type={visible ? 'text' : 'password'} value={value} onChange={onChange} required={required} className="h-10 w-full rounded-md border px-3 pr-10 text-sm" maxLength={150}/>
+      <button type="button" onClick={onToggle} className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-400 hover:text-slate-700" aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}>
+        {visible ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}
+      </button>
+    </div>
+  </div>
+}
+
+function SearchableSelect({ label, name, value, options, onChange, required = false, disabled = false, placeholder = 'Select', country = false }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [openUp, setOpenUp] = useState(false)
+  const rootRef = useRef(null)
   const filtered = options.filter((option) => option.toLowerCase().includes(query.trim().toLowerCase()))
 
   useEffect(() => {
     if (!open) setQuery('')
   }, [open])
 
-  return <div className="relative">
+  useEffect(() => {
+    if (!open) return undefined
+    const closeOnOutsideClick = (event) => {
+      if (!rootRef.current?.contains(event.target)) setOpen(false)
+    }
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', closeOnOutsideClick)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return undefined
+    const position = () => {
+      const button = rootRef.current?.querySelector('button')
+      if (!button) return
+      const bounds = button.getBoundingClientRect()
+      const estimatedHeight = Math.min(280, 48 + Math.min(filtered.length, 8) * 42)
+      setOpenUp(bounds.bottom + estimatedHeight > window.innerHeight - 12 && bounds.top > estimatedHeight + 12)
+    }
+    position()
+    window.addEventListener('resize', position)
+    window.addEventListener('scroll', position, true)
+    return () => { window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true) }
+  }, [open, filtered.length])
+
+  return <div ref={rootRef} className="relative">
     <label htmlFor={`vendor-${name}-search`} className="mb-1.5 block text-xs font-semibold text-slate-700">{label}{required && <span className="text-red-500"> *</span>}</label>
-    <button type="button" disabled={disabled} onClick={() => setOpen((current) => !current)} className="flex h-10 w-full items-center justify-between rounded-md border bg-white px-3 text-left text-sm disabled:bg-slate-50 disabled:text-slate-400">
-      <span className={value ? 'text-slate-900' : 'text-slate-400'}>{value || placeholder}</span>
+    <button type="button" disabled={disabled} onClick={() => setOpen((current) => !current)} className="flex h-10 w-full items-center justify-between rounded-md border bg-white px-3 text-left text-sm shadow-sm transition hover:border-primary focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400">
+      <span className={`flex min-w-0 items-center gap-2 ${value ? 'text-slate-900' : 'text-slate-400'}`}>{country && value && countryByName[value]?.flagUrl && <img src={countryByName[value].flagUrl} alt="" className="h-4 w-6 rounded-sm object-cover"/>}{!country && value && <MapPin className="h-4 w-4 shrink-0 text-primary"/>}<span className="truncate">{value || placeholder}</span></span>
       <ChevronDown className="h-4 w-4 text-slate-400"/>
     </button>
-    {open && !disabled && <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border bg-white shadow-floating">
+    {open && !disabled && <div className={`absolute z-30 w-full overflow-hidden rounded-md border bg-white shadow-floating ${openUp ? 'bottom-full mb-1' : 'mt-1'}`}>
       <div className="flex h-10 items-center gap-2 border-b px-3">
         <Search className="h-4 w-4 text-slate-400"/>
         <input id={`vendor-${name}-search`} autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${label.toLowerCase()}`} className="min-w-0 flex-1 text-sm outline-none"/>
       </div>
       <div className="max-h-44 overflow-y-auto py-1">
-        {filtered.length === 0 ? <div className="px-3 py-2 text-xs text-slate-500">No results found</div> : filtered.map((option) => <button key={option} type="button" onClick={() => { onChange(name, option); setOpen(false) }} className="block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 hover:text-primary">{option}</button>)}
+        {filtered.length === 0 ? <div className="px-3 py-3 text-xs text-slate-500">No results found</div> : filtered.map((option) => <button key={option} type="button" onClick={() => { onChange(name, option); setOpen(false) }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition hover:bg-blue-50 hover:text-primary">{country && countryByName[option]?.flagUrl && <img src={countryByName[option].flagUrl} alt="" className="h-4 w-6 rounded-sm object-cover"/>}{!country && <MapPin className="h-4 w-4 shrink-0 text-slate-400"/>}<span>{option}</span></button>)}
       </div>
     </div>}
   </div>
@@ -89,6 +136,8 @@ function SearchableSelect({ label, name, value, options, onChange, required = fa
 export default function VendorModal({ open, registrationType, vendor, saving, serverError, onClose, onSave, onClearError }) {
   const [form, setForm] = useState(initialForm)
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
   const baseline = { ...initialForm, ...Object.fromEntries(Object.keys(initialForm).map((key) => [key, vendor?.[key] || ''])), password: '', password_confirmation: '', status: vendor?.status || 'pending_approval' }
   const dirty = open && JSON.stringify(form) !== JSON.stringify(baseline)
   const requestClose = () => { if (dirty && !window.confirm('Discard your unsaved vendor changes?')) return; onClose() }
@@ -98,6 +147,8 @@ export default function VendorModal({ open, registrationType, vendor, saving, se
   useEffect(() => {
     if (!open) return
     setForm({ ...initialForm, ...Object.fromEntries(Object.keys(initialForm).map((key) => [key, vendor?.[key] || ''])), password: '', password_confirmation: '', status: vendor?.status || 'pending_approval' })
+    setShowPassword(false)
+    setShowConfirmation(false)
     setError('')
   }, [open, registrationType, vendor])
 
@@ -161,9 +212,9 @@ export default function VendorModal({ open, registrationType, vendor, saving, se
             <Field label="Owner Last Name" name="last_name" value={form.last_name} onChange={change}/>
             <Field label="Phone Number" name="phone" value={form.phone} onChange={change} type="tel" required/>
             <Field label="Email" name="email" value={form.email} onChange={change} type="email" required/>
-            <Field label={vendor?.user ? 'Password (optional)' : 'Password'} name="password" value={form.password} onChange={change} type="password" required={!vendor?.user}/>
-            <Field label={vendor?.user ? 'Confirm Password (if changing)' : 'Confirm Password'} name="password_confirmation" value={form.password_confirmation} onChange={change} type="password" required={!vendor?.user}/>
-            <SearchableSelect label="Country Name" name="country" value={form.country} options={countries} onChange={select} required placeholder="Select country"/>
+            <PasswordField label={vendor?.user ? 'Password (optional)' : 'Password'} name="password" value={form.password} onChange={change} visible={showPassword} onToggle={() => setShowPassword((current) => !current)} required={!vendor?.user}/>
+            <PasswordField label={vendor?.user ? 'Confirm Password (if changing)' : 'Confirm Password'} name="password_confirmation" value={form.password_confirmation} onChange={change} visible={showConfirmation} onToggle={() => setShowConfirmation((current) => !current)} required={!vendor?.user}/>
+            <SearchableSelect label="Country Name" name="country" value={form.country} options={countries} onChange={select} required placeholder="Select country" country/>
             <SearchableSelect label="City Name" name="city" value={form.city} options={cityOptions} onChange={select} required disabled={!form.country} placeholder={form.country ? 'Select city' : 'Select country first'}/>
             <div className="sm:col-span-2"><label htmlFor="vendor-address" className="mb-1.5 block text-xs font-semibold text-slate-700">Address</label><textarea id="vendor-address" name="address" value={form.address} onChange={change} rows="3" className="w-full rounded-md border p-3 text-sm" maxLength={1000}/></div>
           </>}
@@ -174,9 +225,9 @@ export default function VendorModal({ open, registrationType, vendor, saving, se
             <Field label="Owner Last Name" name="last_name" value={form.last_name} onChange={change}/>
             <Field label="Email" name="email" value={form.email} onChange={change} type="email" required/>
             <Field label="Phone Number" name="phone" value={form.phone} onChange={change} type="tel" required/>
-            <Field label={vendor?.user ? 'Password (optional)' : 'Password'} name="password" value={form.password} onChange={change} type="password" required={!vendor?.user}/>
-            <Field label={vendor?.user ? 'Confirm Password (if changing)' : 'Confirm Password'} name="password_confirmation" value={form.password_confirmation} onChange={change} type="password" required={!vendor?.user}/>
-            <SearchableSelect label="Country Name" name="country" value={form.country} options={countries} onChange={select} required placeholder="Select country"/>
+            <PasswordField label={vendor?.user ? 'Password (optional)' : 'Password'} name="password" value={form.password} onChange={change} visible={showPassword} onToggle={() => setShowPassword((current) => !current)} required={!vendor?.user}/>
+            <PasswordField label={vendor?.user ? 'Confirm Password (if changing)' : 'Confirm Password'} name="password_confirmation" value={form.password_confirmation} onChange={change} visible={showConfirmation} onToggle={() => setShowConfirmation((current) => !current)} required={!vendor?.user}/>
+            <SearchableSelect label="Country Name" name="country" value={form.country} options={countries} onChange={select} required placeholder="Select country" country/>
             <SearchableSelect label="City Name" name="city" value={form.city} options={cityOptions} onChange={select} required disabled={!form.country} placeholder={form.country ? 'Select city' : 'Select country first'}/>
             <div className="sm:col-span-2"><label htmlFor="vendor-address" className="mb-1.5 block text-xs font-semibold text-slate-700">Address</label><textarea id="vendor-address" name="address" value={form.address} onChange={change} rows="3" className="w-full rounded-md border p-3 text-sm" maxLength={1000}/></div>
           </>}

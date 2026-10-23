@@ -41,6 +41,7 @@ class VendorController extends Controller
                 'email' => trim($data['email']),
                 'password' => $data['password'],
                 'account_type' => 'vendor',
+                'email_verified_at' => now(),
             ]);
             $user->assignRole('Vendor');
 
@@ -97,10 +98,12 @@ class VendorController extends Controller
         $before = $this->auditSnapshot($vendor);
 
         DB::transaction(function () use ($request, $vendor, $before) {
-            $user = $vendor->user;
+            // Vendor accounts are owned by this profile, so remove the account
+            // permanently as well instead of leaving a soft-deleted user row.
+            $user = $vendor->user_id ? User::withTrashed()->find($vendor->user_id) : null;
             $vendor->delete();
             Audit::record($request, 'vendor.deleted', $vendor, $before);
-            $user?->delete();
+            $user?->forceDelete();
         });
 
         return response()->json([
