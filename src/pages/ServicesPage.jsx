@@ -4,7 +4,7 @@ import Swal from 'sweetalert2'
 import { getBrands } from '../api/brands'
 import { getCategories } from '../api/categories'
 import { getIndustries } from '../api/industries'
-import { createService, deleteService, deleteServiceProduct, getServices, saveServiceImages, updateServiceProduct } from '../api/services'
+import { createService, deleteService, deleteServiceProduct, getServiceImages, getServices, saveServiceImages, updateServiceProduct } from '../api/services'
 import { getVendors } from '../api/vendors'
 import { getSpecifications } from '../api/specifications'
 import { getSellingCountries } from '../api/sellingCountries'
@@ -108,14 +108,24 @@ export default function ServicesPage() {
       setEditorTouched(false)
     }
     const setSellingCountries = (event) => { set('sell_globally', event.detail.sell_globally); set('selling_countries', event.detail.selling_countries) }
-    const editProduct = (event) => {
+    const editProduct = async (event) => {
       const service = event.detail
       pricingServiceType = service.service_type
       const discounts = Object.fromEntries(service.plans.map((plan) => [plan.billing_cycle, Number(plan.discount_percent || 0)]))
       const specifications = Object.fromEntries((service.specification_values || []).map((item) => [item.specification_definition_id, item.value]))
       setForm({ vendor_id: String(service.vendor_id), name: service.name, sku: service.sku || '', inventory_quantity: service.inventory_quantity ?? '', low_stock_threshold: service.low_stock_threshold ?? 5, track_inventory: service.track_inventory ?? true, features: service.features || '', certificates: service.certificates || [], specifications, service_type: service.service_type, deployment: service.deployment || '', ai_enabled: Boolean(service.ai_enabled), sell_globally: Boolean(service.sell_globally), selling_countries: service.selling_countries || [], pricing_mode: service.pricing_mode, category_id: String(service.category_id), subcategory_id: String(service.subcategory_id), industry_ids: (service.industries || []).map((item) => String(item.id)), brand_id: (service.brands || []).map((item) => String(item.id)), monthly_price: String(service.monthly_price || 0), billing_cycles: service.plans.map((plan) => plan.billing_cycle), discounts })
       setEditingId(service.id); setImageFiles([]); setRemovedImageIds([]); setError(''); setEditorTouched(false); setOpen(true)
-      setTimeout(() => { window.dispatchEvent(new CustomEvent('service-editor-mode', { detail: service.id })); window.dispatchEvent(new CustomEvent('service-existing-images-editor-value', { detail: (service.images || []).map((image) => ({ id: image.id, sort_order: image.sort_order, image_url: image.image_url || `/api/marketplace/service-images/${image.id}` })) })); window.dispatchEvent(new CustomEvent('service-ai-editor-value', { detail: Boolean(service.ai_enabled) })); window.dispatchEvent(new CustomEvent('service-certificates-editor-value', { detail: service.certificates || [] })); window.dispatchEvent(new CustomEvent('service-deployment-editor-value', { detail: service.deployment || '' })); window.dispatchEvent(new CustomEvent('service-selling-editor-value', { detail: { sell_globally: Boolean(service.sell_globally), selling_countries: service.selling_countries || [] } })); window.dispatchEvent(new CustomEvent('service-specification-editor-value', { detail: { context: service, values: specifications } })) }, 0)
+      setTimeout(async () => {
+        window.dispatchEvent(new CustomEvent('service-editor-mode', { detail: service.id }))
+        window.dispatchEvent(new CustomEvent('service-existing-images-editor-value', { detail: (service.images || []).map((image) => ({ id: image.id, sort_order: image.sort_order, image_url: image.image_url || `/api/marketplace/service-images/${image.id}` })) }))
+        try {
+          const result = await getServiceImages(service.id)
+          window.dispatchEvent(new CustomEvent('service-existing-images-editor-value', { detail: result.data || [] }))
+        } catch (error) {
+          setError(error.message)
+        }
+        window.dispatchEvent(new CustomEvent('service-ai-editor-value', { detail: Boolean(service.ai_enabled) })); window.dispatchEvent(new CustomEvent('service-certificates-editor-value', { detail: service.certificates || [] })); window.dispatchEvent(new CustomEvent('service-deployment-editor-value', { detail: service.deployment || '' })); window.dispatchEvent(new CustomEvent('service-selling-editor-value', { detail: { sell_globally: Boolean(service.sell_globally), selling_countries: service.selling_countries || [] } })); window.dispatchEvent(new CustomEvent('service-specification-editor-value', { detail: { context: service, values: specifications } }))
+      }, 0)
     }
     window.addEventListener('service-images-selected', addImages)
     window.addEventListener('service-image-removed', removeImage)

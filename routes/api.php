@@ -134,6 +134,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('services', [ServiceController::class, 'store'])->middleware('permission:services.create');
     Route::patch('services/{service}', [ServiceController::class, 'update'])->middleware('permission:services.update');
     Route::put('services/{service}/product', [ServiceController::class, 'updateProduct'])->middleware('permission:services.update');
+    Route::get('services/{service}/images', [ServiceController::class, 'images'])->middleware('permission:services.view');
     Route::put('services/{service}/images', [ServiceController::class, 'updateImages'])->middleware('permission:services.update');
     Route::delete('services/{service}/product', [ServiceController::class, 'destroyProduct'])->middleware('permission:services.delete');
     Route::delete('services/{service}', [ServiceController::class, 'destroy'])->middleware('permission:services.delete');

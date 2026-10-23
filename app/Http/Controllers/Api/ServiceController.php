@@ -235,6 +235,28 @@ class ServiceController extends Controller
         ])]);
     }
 
+    public function images(Request $request, Service $service)
+    {
+        $this->authorizeServiceOwner($request, $service);
+        $planIds = Service::where('vendor_id', $service->vendor_id)
+            ->where('name', $service->name)
+            ->where('service_type', $service->service_type)
+            ->pluck('id');
+
+        $images = ServiceImage::whereIn('service_id', $planIds)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'service_id', 'sort_order'])
+            ->unique('id')
+            ->values();
+
+        return response()->json(['data' => $images->map(fn ($image) => [
+            'id' => $image->id,
+            'sort_order' => $image->sort_order,
+            'image_url' => url('/api/marketplace/service-images/'.$image->id),
+        ])]);
+    }
+
     public function destroyProduct(Request $request, Service $service)
     {
         $this->authorizeServiceOwner($request, $service);
