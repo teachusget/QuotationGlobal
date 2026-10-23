@@ -21,7 +21,7 @@ class ServiceController extends Controller
     {
         // The management table does not render service images. Excluding their
         // base64 payloads keeps this initial request small and fast.
-        $query = Service::with(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'industries:id,name', 'brands:id,name', 'specificationValues.definition'])->latest();
+        $query = Service::with(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'industries:id,name', 'brands:id,name', 'images:id,service_id,sort_order', 'specificationValues.definition'])->latest();
 
         if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
@@ -192,6 +192,46 @@ class ServiceController extends Controller
         Audit::record($request, 'service.product_updated', $service, ['plans' => $before], ['plans' => $services->map(fn ($plan) => $this->auditSnapshot($plan))->all()]);
 
         return response()->json(['message' => 'Complete service updated successfully.', 'data' => $services]);
+    }
+
+    public function updateImages(Request $request, Service $service)
+    {
+        $this->authorizeServiceOwner($request, $service);
+        $data = $request->validate([
+            'image_datas' => ['nullable', 'array', 'max:8'],
+            'image_datas.*' => ['string', 'max:7000000', 'regex:#^data:image/(png|jpeg|webp);base64,#'],
+            'remove_image_ids' => ['nullable', 'array', 'max:8'],
+            'remove_image_ids.*' => ['integer', 'exists:service_images,id'],
+        ]);
+
+        $plans = Service::where('vendor_id', $service->vendor_id)
+            ->where('name', $service->name)
+            ->where('service_type', $service->service_type)
+            ->get();
+        $planIds = $plans->pluck('id');
+
+        DB::transaction(function () use ($data, $plans, $planIds) {
+            $removeIds = collect($data['remove_image_ids'] ?? []);
+            $orders = ServiceImage::whereIn('id', $removeIds)
+                ->whereIn('service_id', $planIds)
+                ->pluck('sort_order');
+            if ($orders->isNotEmpty()) {
+                ServiceImage::whereIn('service_id', $planIds)->whereIn('sort_order', $orders)->delete();
+            }
+            foreach ($plans as $plan) {
+                $lastOrder = (int) $plan->images()->max('sort_order');
+                foreach (array_values(array_filter($data['image_datas'] ?? [])) as $offset => $image) {
+                    $plan->images()->create(['image_data' => $image, 'sort_order' => $lastOrder + $offset + 1]);
+                }
+            }
+        });
+
+        $images = $plans->first()?->fresh()->images()->orderBy('sort_order')->get(['id', 'service_id', 'sort_order']) ?? collect();
+        return response()->json(['message' => 'Service images saved successfully.', 'data' => $images->map(fn ($image) => [
+            'id' => $image->id,
+            'sort_order' => $image->sort_order,
+            'image_url' => url('/api/marketplace/service-images/'.$image->id),
+        ])]);
     }
 
     public function destroyProduct(Request $request, Service $service)

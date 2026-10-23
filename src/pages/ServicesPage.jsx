@@ -4,7 +4,7 @@ import Swal from 'sweetalert2'
 import { getBrands } from '../api/brands'
 import { getCategories } from '../api/categories'
 import { getIndustries } from '../api/industries'
-import { createService, deleteService, deleteServiceProduct, getServices, updateServiceProduct } from '../api/services'
+import { createService, deleteService, deleteServiceProduct, getServices, saveServiceImages, updateServiceProduct } from '../api/services'
 import { getVendors } from '../api/vendors'
 import { getSpecifications } from '../api/specifications'
 import { getSellingCountries } from '../api/sellingCountries'
@@ -46,7 +46,9 @@ function prepareUpload(file) {
 export default function ServicesPage() {
   const { user } = useAuth()
   const isVendor = user?.account_type === 'vendor'
-  const [services, setServices] = useState([]); const [categories, setCategories] = useState([]); const [subs, setSubs] = useState([]); const [industries, setIndustries] = useState([]); const [brands, setBrands] = useState([]); const [vendors, setVendors] = useState([]); const [form, setForm] = useState(blank); const [open, setOpen] = useState(false); const [editingId, setEditingId] = useState(null); const [error, setError] = useState(''); const [saving, setSaving] = useState(false); const [imageFiles, setImageFiles] = useState([]); const [editorTouched, setEditorTouched] = useState(false)
+  const [services, setServices] = useState([]); const [categories, setCategories] = useState([]); const [subs, setSubs] = useState([]); const [industries, setIndustries] = useState([]); const [brands, setBrands] = useState([]); const [vendors, setVendors] = useState([]); const [form, setForm] = useState(blank); const [open, setOpen] = useState(false); const [editingId, setEditingId] = useState(null); const [error, setError] = useState(''); const [saving, setSaving] = useState(false); const [imageFiles, setImageFiles] = useState([]); const [removedImageIds, setRemovedImageIds] = useState([]); const [editorTouched, setEditorTouched] = useState(false)
+  const editingIdRef = useRef(null); const imageFilesRef = useRef([]); const removedImageIdsRef = useRef([])
+  useEffect(() => { editingIdRef.current = editingId }, [editingId]); useEffect(() => { imageFilesRef.current = imageFiles }, [imageFiles]); useEffect(() => { removedImageIdsRef.current = removedImageIds }, [removedImageIds])
   const [servicesLoading, setServicesLoading] = useState(true)
   const closeEditor = () => { if (editorTouched && !window.confirm('Discard your unsaved service changes?')) return; setEditorTouched(false); setOpen(false) }
   const dialogRef = useDialogAccessibility(open, closeEditor, saving)
@@ -83,6 +85,19 @@ export default function ServicesPage() {
   }, [isVendor])
   useEffect(() => {
     const addImages = (event) => { setEditorTouched(true); setImageFiles((current) => [...current, ...event.detail].slice(0, 8)) }
+    const removeImage = (event) => { setEditorTouched(true); setRemovedImageIds((current) => [...new Set([...current, Number(event.detail)])]) }
+    const saveImages = async () => {
+      const id = editingIdRef.current
+      if (!id) return window.alert('Save the service first, then images can be updated here.')
+      setSaving(true)
+      try {
+        const image_datas = await Promise.all(imageFilesRef.current.map((file) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file) })))
+        const result = await saveServiceImages(id, { image_datas, remove_image_ids: removedImageIdsRef.current })
+        setImageFiles([]); setRemovedImageIds([]); setEditorTouched(false)
+        window.dispatchEvent(new CustomEvent('service-existing-images-editor-value', { detail: result.data || [] }))
+        await Swal.fire({ icon: 'success', title: 'Images saved', text: 'Service images have been updated.', timer: 1400, showConfirmButton: false })
+      } catch (err) { setError(err.message) } finally { setSaving(false) }
+    }
     const setAiEnabled = (event) => set('ai_enabled', event.detail)
     const setDeployment = (event) => set('deployment', event.detail)
     const setCertificates = (event) => { setEditorTouched(true); setForm((current) => ({ ...current, certificates: event.detail })) }
@@ -98,10 +113,12 @@ export default function ServicesPage() {
       const discounts = Object.fromEntries(service.plans.map((plan) => [plan.billing_cycle, Number(plan.discount_percent || 0)]))
       const specifications = Object.fromEntries((service.specification_values || []).map((item) => [item.specification_definition_id, item.value]))
       setForm({ vendor_id: String(service.vendor_id), name: service.name, sku: service.sku || '', inventory_quantity: service.inventory_quantity ?? '', low_stock_threshold: service.low_stock_threshold ?? 5, track_inventory: service.track_inventory ?? true, features: service.features || '', certificates: service.certificates || [], specifications, service_type: service.service_type, deployment: service.deployment || '', ai_enabled: Boolean(service.ai_enabled), sell_globally: Boolean(service.sell_globally), selling_countries: service.selling_countries || [], pricing_mode: service.pricing_mode, category_id: String(service.category_id), subcategory_id: String(service.subcategory_id), industry_ids: (service.industries || []).map((item) => String(item.id)), brand_id: (service.brands || []).map((item) => String(item.id)), monthly_price: String(service.monthly_price || 0), billing_cycles: service.plans.map((plan) => plan.billing_cycle), discounts })
-      setEditingId(service.id); setError(''); setEditorTouched(false); setOpen(true)
-      setTimeout(() => { window.dispatchEvent(new CustomEvent('service-ai-editor-value', { detail: Boolean(service.ai_enabled) })); window.dispatchEvent(new CustomEvent('service-certificates-editor-value', { detail: service.certificates || [] })); window.dispatchEvent(new CustomEvent('service-deployment-editor-value', { detail: service.deployment || '' })); window.dispatchEvent(new CustomEvent('service-selling-editor-value', { detail: { sell_globally: Boolean(service.sell_globally), selling_countries: service.selling_countries || [] } })); window.dispatchEvent(new CustomEvent('service-specification-editor-value', { detail: { context: service, values: specifications } })) }, 0)
+      setEditingId(service.id); setImageFiles([]); setRemovedImageIds([]); setError(''); setEditorTouched(false); setOpen(true)
+      setTimeout(() => { window.dispatchEvent(new CustomEvent('service-editor-mode', { detail: service.id })); window.dispatchEvent(new CustomEvent('service-existing-images-editor-value', { detail: (service.images || []).map((image) => ({ id: image.id, sort_order: image.sort_order, image_url: image.image_url || `/api/marketplace/service-images/${image.id}` })) })); window.dispatchEvent(new CustomEvent('service-ai-editor-value', { detail: Boolean(service.ai_enabled) })); window.dispatchEvent(new CustomEvent('service-certificates-editor-value', { detail: service.certificates || [] })); window.dispatchEvent(new CustomEvent('service-deployment-editor-value', { detail: service.deployment || '' })); window.dispatchEvent(new CustomEvent('service-selling-editor-value', { detail: { sell_globally: Boolean(service.sell_globally), selling_countries: service.selling_countries || [] } })); window.dispatchEvent(new CustomEvent('service-specification-editor-value', { detail: { context: service, values: specifications } })) }, 0)
     }
     window.addEventListener('service-images-selected', addImages)
+    window.addEventListener('service-image-removed', removeImage)
+    window.addEventListener('service-images-save-requested', saveImages)
     window.addEventListener('service-ai-selected', setAiEnabled)
     window.addEventListener('service-deployment-selected', setDeployment)
     window.addEventListener('service-certificates-selected', setCertificates)
@@ -112,6 +129,8 @@ export default function ServicesPage() {
     window.addEventListener('service-specifications-changed', setSpecifications)
     return () => {
       window.removeEventListener('service-images-selected', addImages)
+      window.removeEventListener('service-image-removed', removeImage)
+      window.removeEventListener('service-images-save-requested', saveImages)
       window.removeEventListener('service-ai-selected', setAiEnabled)
       window.removeEventListener('service-deployment-selected', setDeployment)
       window.removeEventListener('service-certificates-selected', setCertificates)
@@ -183,9 +202,13 @@ function MultiIndustries({ options, value, onChange }) {
 }
 function Text({ label, value, onChange, required, type = 'text', wide }) {
   const [previews, setPreviews] = useState([])
+  const [existingImages, setExistingImages] = useState([])
+  const [editingServiceId, setEditingServiceId] = useState(null)
   const imageInputRef = useRef(null)
   const [serviceType, setServiceType] = useState(pricingServiceType)
   useEffect(() => { const changed = (event) => setServiceType(event.detail); window.addEventListener('service-type-changed', changed); return () => window.removeEventListener('service-type-changed', changed) }, [])
+  useEffect(() => { const load = (event) => setExistingImages(event.detail || []); const mode = (event) => setEditingServiceId(event.detail || null); window.addEventListener('service-existing-images-editor-value', load); window.addEventListener('service-editor-mode', mode); return () => { window.removeEventListener('service-existing-images-editor-value', load); window.removeEventListener('service-editor-mode', mode) } }, [])
+  useEffect(() => { const clear = () => { setPreviews([]); setExistingImages([]); setEditingServiceId(null) }; window.addEventListener('service-images-saved', clear); return () => window.removeEventListener('service-images-saved', clear) }, [])
   const selectImages = async (event) => {
     const added = [...event.target.files]
     event.target.value = ''
@@ -206,9 +229,11 @@ function Text({ label, value, onChange, required, type = 'text', wide }) {
     : serviceType === 'services' && type === 'number'
       ? (label.startsWith('Flexible') ? 'Flexible Monthly Base Rate (USD)' : 'Fixed Monthly Base Rate (USD)')
       : label
+  const imagePanel = label === 'Service Name' && <div className="mt-3 rounded border border-blue-100 p-2"><div className="flex flex-wrap items-center gap-2"><span className="text-[11px] text-slate-500">Existing images: {existingImages.length}</span>{editingServiceId && <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('service-images-save-requested'))} className="h-8 rounded-md bg-primary px-3 text-xs font-semibold text-white">Save images</button>}</div>{existingImages.length > 0 && <div className="mt-2 grid grid-cols-4 gap-2">{existingImages.map((image) => <div key={image.id} className="relative"><img src={image.image_url} alt="Existing service" className="h-16 w-full rounded border object-cover"/><button type="button" onClick={() => { setExistingImages((current) => current.filter((item) => item.id !== image.id)); window.dispatchEvent(new CustomEvent('service-image-removed', { detail: image.id })) }} className="absolute right-1 top-1 rounded-full bg-red-600 px-1.5 text-xs text-white">×</button></div>)}</div>}</div>
   return <div className={`text-xs font-semibold ${wide ? 'sm:col-span-2' : ''}`}>
     <label>{shownLabel}{required && ' *'}<input data-hardware-unit-price={isHardwarePrice || undefined} type={type} value={value} required={required} min={type === 'number' ? '0' : undefined} step={type === 'number' ? '0.01' : undefined} onChange={(e) => onChange(e.target.value)} className="mt-1.5 h-10 w-full rounded-md border px-3 text-sm font-normal"/></label>
     {label === 'Service Name' && <label className="mt-3 block">Service Images <span className="font-normal text-slate-500">(up to 8 PNG, JPG or WebP files · maximum 5 MB each)</span><input ref={imageInputRef} id="service-image" type="file" multiple accept="image/png,image/jpeg,image/webp" onChange={selectImages} className="sr-only"/><div className="mt-1.5 flex flex-wrap items-center gap-2"><button type="button" onClick={() => imageInputRef.current?.click()} disabled={previews.length >= 8} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-primary px-3 text-xs font-semibold text-primary hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"><Upload className="h-3.5 w-3.5"/>{previews.length ? 'Upload more images' : 'Upload images'}</button><span className="text-[11px] text-slate-500">{previews.length}/8 selected · final upload happens on Save Service</span></div>{previews.length > 0 && <><span className="mt-3 grid grid-cols-4 gap-2">{previews.map((image) => <img key={image.url} src={image.url} alt={image.name} className="h-16 w-full rounded border object-cover"/>)}</span><button type="button" onClick={() => imageInputRef.current?.click()} disabled={previews.length >= 8} className="mt-3 h-9 rounded-md border border-primary px-3 text-xs font-semibold text-primary hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50">{previews.length >= 8 ? 'Maximum 8 images added' : 'Add another image'}</button></>}</label>}
+    {imagePanel}
   </div>
 }
 

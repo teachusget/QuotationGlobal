@@ -26,4 +26,5 @@ export const createService = (payload) => mutateServices('/api/services', { meth
 export const deleteService = (id) => mutateServices(`/api/services/${id}`, { method: 'DELETE' })
 export const updateService = (id, payload) => mutateServices(`/api/services/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
 export const updateServiceProduct = (id, payload) => mutateServices(`/api/services/${id}/product`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+export const saveServiceImages = (id, payload) => mutateServices(`/api/services/${id}/images`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
 export const deleteServiceProduct = (id) => mutateServices(`/api/services/${id}/product`, { method: 'DELETE' })
