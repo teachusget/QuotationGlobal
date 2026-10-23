@@ -37,7 +37,7 @@ class ServiceController extends Controller
     {
         $version = Cache::get('marketplace:services:version', 1);
         $data = Cache::remember("marketplace:services:v2:{$version}", 300, function () {
-            $services = Service::query()->select([
+            $services = Service::query()->whereHas('vendor', fn ($vendor) => $vendor->where('status', 'approved'))->select([
                 'id', 'vendor_id', 'category_id', 'subcategory_id', 'brand_id', 'name',
                 'service_type', 'pricing_mode', 'price_from', 'monthly_price', 'discount_percent',
                 'billing_cycle', 'ai_enabled', 'sell_globally', 'selling_countries', 'created_at',
@@ -57,6 +57,7 @@ class ServiceController extends Controller
 
     public function marketplaceShow(Service $service)
     {
+        abort_unless($service->vendor()->where('status', 'approved')->exists(), 404);
         $version = Cache::get('marketplace:services:version', 1);
         $data = Cache::remember("marketplace:service:{$version}:{$service->id}", 300, function () use ($service) {
         $plans = Service::with(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'brand:id,name', 'brands:id,name', 'industries:id,name'])
@@ -178,13 +179,14 @@ class ServiceController extends Controller
         // remain intact; the client sends only newly selected files.
         $images = array_values(array_filter([...($data['image_datas'] ?? []), $data['image_data'] ?? null]));
         if ($images) {
-            $lastOrder = (int) ServiceImage::whereIn('service_id', $services->pluck('id'))
-                ->max('sort_order');
-            foreach ($images as $offset => $image) {
-                $services->first()->images()->create([
-                    'image_data' => $image,
-                    'sort_order' => $lastOrder + $offset + 1,
-                ]);
+            foreach ($services as $servicePlan) {
+                $lastOrder = (int) $servicePlan->images()->max('sort_order');
+                foreach ($images as $offset => $image) {
+                    $servicePlan->images()->create([
+                        'image_data' => $image,
+                        'sort_order' => $lastOrder + $offset + 1,
+                    ]);
+                }
             }
         }
         Audit::record($request, 'service.product_updated', $service, ['plans' => $before], ['plans' => $services->map(fn ($plan) => $this->auditSnapshot($plan))->all()]);
@@ -279,6 +281,15 @@ class ServiceController extends Controller
         $data = $service->toArray();
         unset($data['image_data']);
         $images = $service->relationLoaded('images') ? $service->images : collect();
+        if ($images->isEmpty()) {
+            $canonical = Service::where('vendor_id', $service->vendor_id)
+                ->where('name', $service->name)
+                ->where('service_type', $service->service_type)
+                ->oldest('id')
+                ->with('images')
+                ->first();
+            $images = $canonical?->images ?? collect();
+        }
         $data['images'] = ($allImages ? $images : $images->take(1))->map(fn ($image) => [
             'id' => $image->id,
             'sort_order' => $image->sort_order,

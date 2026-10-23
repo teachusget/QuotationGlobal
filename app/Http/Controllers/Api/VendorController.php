@@ -9,6 +9,7 @@ use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -139,6 +140,7 @@ class VendorController extends Controller
 
         DB::transaction(function () use ($request, $vendor, $before, $status, $data) {
             $vendor->update(['status' => $status]);
+            Cache::put('marketplace:services:version', ((int) Cache::get('marketplace:services:version', 1)) + 1);
             if (! $data['active']) {
                 $vendor->user?->tokens()->delete();
             }
