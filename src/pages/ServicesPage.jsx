@@ -94,6 +94,7 @@ export default function ServicesPage() {
         const image_datas = await Promise.all(imageFilesRef.current.map((file) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file) })))
         const result = await saveServiceImages(id, { image_datas, remove_image_ids: removedImageIdsRef.current })
         setImageFiles([]); setRemovedImageIds([]); setEditorTouched(false)
+        window.dispatchEvent(new CustomEvent('service-images-saved'))
         window.dispatchEvent(new CustomEvent('service-existing-images-editor-value', { detail: result.data || [] }))
         await Swal.fire({ icon: 'success', title: 'Images saved', text: 'Service images have been updated.', timer: 1400, showConfirmButton: false })
       } catch (err) { setError(err.message) } finally { setSaving(false) }
@@ -162,6 +163,11 @@ function ServiceTable({ services, showVendor = false }) {
     const key = [service.name, service.service_type, service.category_id, service.subcategory_id, service.pricing_mode].join('|')
     if (!all[key]) all[key] = { ...service, plans: [] }
     all[key].plans.push(service)
+    // Images are stored per pricing plan. The editor represents the complete
+    // service, so expose every unique image from all plans in the grouped row.
+    const images = [...(all[key].images || []), ...(service.images || [])]
+    all[key].images = [...new Map(images.map((image) => [image.id, image])).values()]
+      .sort((left, right) => Number(left.sort_order || 0) - Number(right.sort_order || 0))
     return all
   }, {}))
   return <div className="mt-6 overflow-x-auto rounded-lg border bg-white">

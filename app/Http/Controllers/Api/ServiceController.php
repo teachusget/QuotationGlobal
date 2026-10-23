@@ -191,6 +191,7 @@ class ServiceController extends Controller
         }
         Audit::record($request, 'service.product_updated', $service, ['plans' => $before], ['plans' => $services->map(fn ($plan) => $this->auditSnapshot($plan))->all()]);
 
+        $services->each(fn ($plan) => $plan->load(['images:id,service_id,sort_order']));
         return response()->json(['message' => 'Complete service updated successfully.', 'data' => $services]);
     }
 
