@@ -20,6 +20,7 @@ export default function ProductPage() {
   const { id } = useParams()
   const navigate = useNavigate(); const { user } = useAuth()
   const [service, setService] = useState(null)
+  const [loadError, setLoadError] = useState('')
   const [plans, setPlans] = useState([])
   const [imageIndex, setImageIndex] = useState(0)
   const [selectedPlan, setSelectedPlan] = useState(null)
@@ -49,13 +50,22 @@ export default function ProductPage() {
   useEffect(() => { if (!requestDirty) return undefined; const warn = (event) => { event.preventDefault(); event.returnValue = '' }; window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn) }, [requestDirty])
 
   useEffect(() => {
+    setService(null); setPlans([]); setLoadError('')
     getMarketplaceService(id).then((result) => {
       currentProductType = result.service?.service_type || ''
       setService(result.service)
       setPlans(result.plans || [])
       setSelectedPlan(result.plans?.[0] || result.service)
-    })
-    getServiceRatings(id).then(setRatings).catch(() => {})
+    }).catch((error) => setLoadError(error.message || 'Unable to load this service.'))
+    // Ratings are secondary content. Do not compete with the critical service
+    // request during the first paint.
+    const loadRatings = () => getServiceRatings(id).then(setRatings).catch(() => {})
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(loadRatings, { timeout: 1200 })
+      return () => window.cancelIdleCallback(idleId)
+    }
+    const timeoutId = window.setTimeout(loadRatings, 0)
+    return () => window.clearTimeout(timeoutId)
   }, [id])
 
   const saveRating = async (event) => {
@@ -87,6 +97,7 @@ export default function ProductPage() {
     } catch (err) { setMessage(err.message) } finally { setSending(false) }
   }
 
+  if (loadError) return <section role="alert" className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700"><h1 className="font-bold">Unable to load service</h1><p className="mt-2">{loadError}</p><Link to="/services" className="mt-4 inline-flex font-semibold underline">Back to services</Link></section>
   if (!service || !selectedPlan) return <section aria-label="Loading product" className="grid gap-6 lg:grid-cols-[1.1fr_.9fr]"><Skeleton className="h-[460px] rounded-2xl"/><div><Skeleton className="h-5 w-24"/><Skeleton className="mt-5 h-9 w-4/5"/><Skeleton className="mt-3 h-4 w-1/2"/><Skeleton className="mt-8 h-44 rounded-xl"/><Skeleton className="mt-5 h-11 w-40"/></div></section>
 
   const images = (service.images || []).map((image) => ({ ...image, image_data: image.image_url || image.image_data }))

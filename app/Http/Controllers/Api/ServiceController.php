@@ -55,12 +55,25 @@ class ServiceController extends Controller
             ->header('Cache-Control', 'public, max-age=120, stale-while-revalidate=300');
     }
 
-    public function marketplaceShow(Service $service)
+    public function marketplaceShow(Request $request, Service $service)
     {
-        abort_unless($service->vendor()->where('status', 'approved')->exists(), 404);
+        $isApproved = $service->vendor()->where('status', 'approved')->exists();
+        $viewer = $request->user() ?: auth('sanctum')->user();
+        $canPreview = $viewer && in_array($viewer->account_type, ['admin', 'staff'], true);
+
+        if ($viewer?->account_type === 'vendor') {
+            $canPreview = Vendor::where('user_id', $viewer->id)->whereKey($service->vendor_id)->exists();
+        }
+
+        abort_unless($isApproved || $canPreview, 404, 'This service is not available in the marketplace.');
         $version = Cache::get('marketplace:services:version', 1);
-        $data = Cache::remember("marketplace:service:{$version}:{$service->id}", 300, function () use ($service) {
-        $plans = Service::with(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'brand:id,name', 'brands:id,name', 'industries:id,name'])
+        $cacheScope = $canPreview && ! $isApproved ? 'preview' : 'public';
+        $data = Cache::remember("marketplace:service:{$cacheScope}:{$version}:{$service->id}", 300, function () use ($service) {
+        $plans = Service::with([
+            'vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name',
+            'brand:id,name', 'brands:id,name', 'industries:id,name',
+            'images:id,service_id,sort_order',
+        ])
             ->where('vendor_id', $service->vendor_id)
             ->where('name', $service->name)
             ->where('service_type', $service->service_type)
@@ -74,7 +87,7 @@ class ServiceController extends Controller
         ];
         });
         return response()->json(['data' => $data])
-            ->header('Cache-Control', 'public, max-age=120, stale-while-revalidate=300');
+            ->header('Cache-Control', $canPreview && ! $isApproved ? 'private, no-store' : 'public, max-age=120, stale-while-revalidate=300');
     }
 
     public function marketplaceImage(ServiceImage $serviceImage)
@@ -158,12 +171,19 @@ class ServiceController extends Controller
         $this->validateBillingCyclesForType($data);
         $multipliers = ['hourly' => 1, 'daily' => 1, 'monthly' => 1, 'quarterly' => 3, 'semi_annual' => 6, 'annual' => 12];
         $shared = collect($data)->except(['vendor_id', 'billing_cycles', 'discounts', 'monthly_price', 'industry_ids', 'brand_ids', 'image_data', 'image_datas', 'specifications'])->all();
+        $existingImages = ServiceImage::whereIn('service_id', Service::where($original)->pluck('id'))
+            ->orderBy('sort_order')
+            ->get(['image_data', 'sort_order'])
+            ->unique('image_data')
+            ->values()
+            ->map(fn ($image) => ['image_data' => $image->image_data, 'sort_order' => $image->sort_order])
+            ->all();
 
-        $services = DB::transaction(function () use ($data, $shared, $original, $targetVendorId, $multipliers) {
+        $services = DB::transaction(function () use ($data, $shared, $original, $targetVendorId, $multipliers, $existingImages) {
             $plans = Service::where($original)->get()->keyBy('billing_cycle');
             $plans->except($data['billing_cycles'])->each->delete();
 
-            return collect($data['billing_cycles'])->map(function ($cycle) use ($data, $shared, $plans, $targetVendorId, $multipliers) {
+            $services = collect($data['billing_cycles'])->map(function ($cycle) use ($data, $shared, $plans, $targetVendorId, $multipliers) {
                 $discount = (float) ($data['discounts'][$cycle] ?? 0);
                 $serviceMultipliers = ['hourly' => 1 / 720, 'daily' => 1 / 30, 'monthly' => 1, 'annual' => 12];
                 $total = (float) $data['monthly_price'] * ($data['service_type'] === 'services' ? $serviceMultipliers[$cycle] : $multipliers[$cycle]) * (1 - $discount / 100);
@@ -174,19 +194,26 @@ class ServiceController extends Controller
                 $this->syncSpecifications($plan, $data['specifications'] ?? []);
                 return $plan->load(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'industries:id,name', 'brands:id,name']);
             });
+
+            if ($existingImages && ! $services->contains(fn ($plan) => $plan->images()->exists())) {
+                $canonical = $services->first();
+                foreach ($existingImages as $image) {
+                    $canonical?->images()->create($image);
+                }
+            }
+
+            return $services;
         });
         // Add newly selected images during an edit as well. Existing images
         // remain intact; the client sends only newly selected files.
         $images = array_values(array_filter([...($data['image_datas'] ?? []), $data['image_data'] ?? null]));
-        if ($images) {
-            foreach ($services as $servicePlan) {
-                $lastOrder = (int) $servicePlan->images()->max('sort_order');
-                foreach ($images as $offset => $image) {
-                    $servicePlan->images()->create([
-                        'image_data' => $image,
-                        'sort_order' => $lastOrder + $offset + 1,
-                    ]);
-                }
+        if ($images && ($canonical = $services->first())) {
+            $lastOrder = (int) $canonical->images()->max('sort_order');
+            foreach ($images as $offset => $image) {
+                $canonical->images()->create([
+                    'image_data' => $image,
+                    'sort_order' => $lastOrder + $offset + 1,
+                ]);
             }
         }
         Audit::record($request, 'service.product_updated', $service, ['plans' => $before], ['plans' => $services->map(fn ($plan) => $this->auditSnapshot($plan))->all()]);
@@ -211,7 +238,8 @@ class ServiceController extends Controller
             ->get();
         $planIds = $plans->pluck('id');
 
-        DB::transaction(function () use ($data, $plans, $planIds) {
+        $canonical = $plans->sortBy('id')->first();
+        DB::transaction(function () use ($data, $plans, $planIds, $canonical) {
             $removeIds = collect($data['remove_image_ids'] ?? []);
             $orders = ServiceImage::whereIn('id', $removeIds)
                 ->whereIn('service_id', $planIds)
@@ -219,20 +247,26 @@ class ServiceController extends Controller
             if ($orders->isNotEmpty()) {
                 ServiceImage::whereIn('service_id', $planIds)->whereIn('sort_order', $orders)->delete();
             }
-            foreach ($plans as $plan) {
-                $lastOrder = (int) $plan->images()->max('sort_order');
+            if ($canonical) {
+                ServiceImage::whereIn('service_id', $planIds->reject(fn ($id) => $id === $canonical->id))->delete();
+                $lastOrder = (int) $canonical->images()->max('sort_order');
                 foreach (array_values(array_filter($data['image_datas'] ?? [])) as $offset => $image) {
-                    $plan->images()->create(['image_data' => $image, 'sort_order' => $lastOrder + $offset + 1]);
+                    $canonical->images()->create(['image_data' => $image, 'sort_order' => $lastOrder + $offset + 1]);
                 }
             }
         });
 
-        $images = $plans->first()?->fresh()->images()->orderBy('sort_order')->get(['id', 'service_id', 'sort_order']) ?? collect();
+        // Image changes must invalidate the marketplace detail cache even when
+        // the parent service itself was not updated.
+        Cache::put('marketplace:services:version', ((int) Cache::get('marketplace:services:version', 1)) + 1);
+
+        $images = $canonical?->fresh()->images()->orderBy('sort_order')->get(['id', 'service_id', 'sort_order']) ?? collect();
+        abort_if(! empty($data['image_datas']) && $images->isEmpty(), 422, 'The selected image could not be saved.');
         return response()->json(['message' => 'Service images saved successfully.', 'data' => $images->map(fn ($image) => [
             'id' => $image->id,
             'sort_order' => $image->sort_order,
-            'image_url' => url('/api/marketplace/service-images/'.$image->id),
-        ])]);
+            'image_url' => '/api/marketplace/service-images/'.$image->id,
+        ])])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
     public function images(Request $request, Service $service)
@@ -243,18 +277,17 @@ class ServiceController extends Controller
             ->where('service_type', $service->service_type)
             ->pluck('id');
 
-        $images = ServiceImage::whereIn('service_id', $planIds)
+        $canonicalId = $planIds->sort()->first();
+        $images = ServiceImage::where('service_id', $canonicalId)
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get(['id', 'service_id', 'sort_order'])
-            ->unique('id')
-            ->values();
+            ->get(['id', 'service_id', 'sort_order']);
 
         return response()->json(['data' => $images->map(fn ($image) => [
             'id' => $image->id,
             'sort_order' => $image->sort_order,
-            'image_url' => url('/api/marketplace/service-images/'.$image->id),
-        ])]);
+            'image_url' => '/api/marketplace/service-images/'.$image->id,
+        ])])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
     }
 
     public function destroyProduct(Request $request, Service $service)
@@ -328,15 +361,19 @@ class ServiceController extends Controller
                 $service->industries()->sync($data['industry_ids']);
                 $service->brands()->sync($data['brand_ids'] ?? []);
                 $this->syncSpecifications($service, $data['specifications'] ?? []);
-                $images = array_values(array_filter([...($data['image_datas'] ?? []), $data['image_data'] ?? null]));
-                foreach ($images as $order => $image) $service->images()->create(['image_data' => $image, 'sort_order' => $order]);
                 return $service;
             });
         });
+        $images = array_values(array_filter([...($data['image_datas'] ?? []), $data['image_data'] ?? null]));
+        if ($images && ($canonical = $services->sortBy('id')->first())) {
+            foreach ($images as $order => $image) {
+                $canonical->images()->create(['image_data' => $image, 'sort_order' => $order]);
+            }
+        }
         foreach ($services as $service) {
             Audit::record($request, 'service.created', $service, null, $this->auditSnapshot($service));
         }
-        return response()->json(['message' => 'Service pricing saved successfully.', 'data' => $services->map(fn ($service) => $service->load(['category:id,name', 'subcategory:id,name', 'industries:id,name', 'brands:id,name']))], 201);
+        return response()->json(['message' => 'Service pricing saved successfully.', 'data' => $services->map(fn ($service) => $service->load(['category:id,name', 'subcategory:id,name', 'industries:id,name', 'brands:id,name', 'images:id,service_id,sort_order']))], 201);
     }
 
     private function marketplaceResource(Service $service, bool $allImages = false): array
@@ -356,7 +393,9 @@ class ServiceController extends Controller
         $data['images'] = ($allImages ? $images : $images->take(1))->map(fn ($image) => [
             'id' => $image->id,
             'sort_order' => $image->sort_order,
-            'image_url' => url('/api/marketplace/service-images/'.$image->id),
+            // Keep the URL origin-independent for localhost/127.0.0.1 and
+            // reverse-proxy deployments.
+            'image_url' => '/api/marketplace/service-images/'.$image->id,
         ])->values();
 
         return $data;
