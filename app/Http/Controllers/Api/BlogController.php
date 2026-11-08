@@ -100,7 +100,14 @@ class BlogController extends Controller
 
     public function index(Request $request)
     {
-        $query = BlogPost::with('author:id,name')->when(!$request->user(), fn ($q) => $q->where('status', 'published')->whereNotNull('published_at'))
+        $isPublicList = ! $request->user();
+        $query = BlogPost::query()
+            ->when($isPublicList, fn ($q) => $q->select([
+                'id', 'author_id', 'title', 'slug', 'excerpt', 'cover_image_url',
+                'youtube_video_id', 'external_link', 'gallery_images', 'category',
+                'status', 'published_at', 'created_at', 'updated_at',
+            ]))
+            ->with('author:id,name')->when($isPublicList, fn ($q) => $q->where('status', 'published')->whereNotNull('published_at'))
             ->when($request->routeIs('blog.editor'), fn ($q) => $q->where(fn ($x) => $x->where('status', 'published')->whereNotNull('published_at')->orWhere('author_id', $request->user()->id)))
             ->when($request->user() && !$request->routeIs('blog.editor') && !$request->user()->can('blog.manage'), fn ($q) => $q->where('status', 'published')->whereNotNull('published_at'))
             ->when($request->string('category')->trim()->value(), fn ($q, $v) => $q->where('category', $v))

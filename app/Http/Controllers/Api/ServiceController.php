@@ -21,7 +21,16 @@ class ServiceController extends Controller
     {
         // The management table does not render service images. Excluding their
         // base64 payloads keeps this initial request small and fast.
-        $query = Service::with(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'industries:id,name', 'brands:id,name', 'images:id,service_id,sort_order', 'specificationValues.definition'])->latest();
+        // The management table does not need the legacy binary image payload.
+        // Selecting columns explicitly prevents base64 image data from making
+        // the initial services response enormous while keeping editor fields.
+        $query = Service::select([
+            'id', 'vendor_id', 'category_id', 'subcategory_id', 'industry_id', 'brand_id',
+            'name', 'sku', 'inventory_quantity', 'low_stock_threshold', 'track_inventory',
+            'features', 'certificates', 'service_type', 'deployment', 'ai_enabled',
+            'sell_globally', 'selling_countries', 'pricing_mode', 'price_from',
+            'monthly_price', 'discount_percent', 'billing_cycle', 'created_at',
+        ])->with(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'industries:id,name', 'brands:id,name', 'images:id,service_id,sort_order', 'specificationValues.definition'])->latest();
 
         if ($request->user()->account_type === 'vendor') {
             $vendor = Vendor::where('user_id', $request->user()->id)->firstOrFail();
