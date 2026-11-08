@@ -19,7 +19,7 @@ class RbacSeeder extends Seeder
         'specifications.view','specifications.create','specifications.update','specifications.delete','rfqs.view','rfqs.create','rfqs.update','rfqs.quote','rfqs.respond',
         'demos.view','demos.update','demos.moderate','messages.view','messages.send','purchase_orders.view','purchase_orders.create','purchase_orders.assign_vendor','purchase_orders.send',
         'marketplace_builder.view','marketplace_builder.update','marketplace_builder.publish','marketplace_builder.manage_media',
-        'settings.manage',
+        'settings.manage','blog.view','blog.create','blog.update','blog.delete','blog.manage',
     ];
 
     public function run(): void
@@ -32,11 +32,16 @@ class RbacSeeder extends Seeder
         $super->syncPermissions(Permission::all());
         $buyer->syncPermissions(Permission::whereIn('name', ['rfqs.view','rfqs.respond','demos.view','messages.view','messages.send','purchase_orders.create'])->get());
         $vendor->syncPermissions(Permission::whereIn('name', ['vendors.view','customers.view','categories.view','industries.view','brands.view','brands.create','brands.update','services.view','services.create','services.update','services.delete','rfqs.view','rfqs.quote','demos.view','demos.update','messages.view','messages.send','purchase_orders.view','purchase_orders.send'])->get());
+        $blogAuthor = Role::firstOrCreate(['name' => 'Blog Author', 'guard_name' => 'web']);
+        $blogAuthor->syncPermissions(Permission::whereIn('name', ['blog.view', 'blog.create', 'blog.update'])->get());
 
         $email = env('SUPER_ADMIN_EMAIL');
         $password = env('SUPER_ADMIN_PASSWORD');
         if ($email && $password) {
-            $admin = User::updateOrCreate(['email' => $email], [
+            // This seeder is also called by the original RBAC migration, before
+            // the later users.deleted_at migration has run. Avoid the
+            // SoftDeletes global scope during that bootstrap step.
+            $admin = User::withoutGlobalScopes()->updateOrCreate(['email' => $email], [
                 'name' => env('SUPER_ADMIN_NAME', 'Super Admin'),
                 'username' => env('SUPER_ADMIN_USERNAME', 'superadmin'),
                 'password' => $password,

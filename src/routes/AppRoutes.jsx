@@ -51,6 +51,7 @@ const MarketplaceIndustriesPage = lazy(() => import('../pages/MarketplaceIndustr
 const SellingCountriesPage = lazy(() => import('../pages/SellingCountriesPage'))
 const AdvicePage = lazy(() => import('../pages/AdvicePage'))
 const ContactPage = lazy(() => import('../pages/ContactPage'))
+const BlogPage = lazy(() => import('../pages/BlogPage'))
 
 export default function AppRoutes() {
   const { user } = useAuth()
@@ -58,7 +59,7 @@ export default function AppRoutes() {
   const isBuyer = user?.account_type === 'buyer'
   const isAdmin = !isVendor && !isBuyer
   const categoryPaths = ['/categories', '/sub-categories']
-  const implementedPaths = ['/', '/brands', '/industries', '/vendors', '/customers', '/services', '/marketplace', '/rfqs', '/advice', '/advice-requests', '/compare', '/specification-templates', '/selling-countries', '/featured-banner-ads', ...categoryPaths]
+  const implementedPaths = ['/', '/brands', '/industries', '/vendors', '/customers', '/services', '/marketplace', '/blog', '/rfqs', '/advice', '/advice-requests', '/compare', '/specification-templates', '/selling-countries', '/featured-banner-ads', ...categoryPaths]
   const placeholderItems = allNavigation.filter((item) => item.path !== '/rfqs' && !implementedPaths.includes(item.path))
 
   return <Suspense fallback={<div className="mx-auto min-h-96 w-full max-w-[1440px] animate-pulse rounded-xl bg-slate-100"/>}><Routes>
@@ -79,6 +80,8 @@ export default function AppRoutes() {
       <Route path="/marketplace/type/:type" element={<ServiceTypePage/>}/>
       <Route path="/compare" element={<ComparePage/>}/>
       <Route path="/contact" element={<ContactPage/>}/>
+      <Route path="/blog" element={<BlogPage/>}/>
+      <Route path="/blog/:slug" element={<BlogPage/>}/>
     </Route>
     <Route element={<ProtectedRoute/>}>
       <Route element={<AppLayout/>}>

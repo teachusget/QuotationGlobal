@@ -89,6 +89,16 @@ form[aria-label="Service editor"] > div.mt-5.rounded-md.border.p-3:has(> h3:only
 }
 
 @layer components {
+  /* Keep the blog editor inside the viewport; only its panel should scroll. */
+  [class~="z-[100]"] { align-items: center !important; overflow: hidden !important; }
+  [class~="z-[100]"] > div { max-height: calc(100vh - 2rem); overflow-y: auto; width: 100%; }
+  /* Blog toolbar actions stay together on the right on wider screens. */
+  [class~="lg:justify-between"] > div:first-child { min-width: 0; flex-wrap: wrap !important; overflow: visible !important; }
+  [class~="lg:justify-between"] > div:last-child { margin-left: auto; min-width: 0; max-width: 100%; justify-content: flex-end; border: 1px solid rgb(203 213 225); border-radius: .75rem; background: white; padding: .25rem; }
+  @media (min-width: 1024px) {
+    [class~="lg:justify-between"] { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+    [class~="lg:justify-between"] > div:last-child { flex-wrap: nowrap; }
+  }
   .ui-page-header { @apply flex flex-col justify-between gap-5 rounded-2xl border bg-white px-5 py-5 shadow-subtle sm:flex-row sm:items-center sm:px-6; }
   .ui-page-header > div:first-child > p:first-child, .ui-page-header .text-blue-100, .ui-page-header .text-blue-200 { @apply text-slate-500; }
   .ui-page-header h1 { @apply text-2xl font-bold tracking-[-.025em] text-slate-950 lg:text-[28px]; }

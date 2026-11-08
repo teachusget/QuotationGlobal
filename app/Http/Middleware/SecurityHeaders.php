@@ -20,7 +20,7 @@ class SecurityHeaders
         $response->headers->set('X-Permitted-Cross-Domain-Policies', 'none');
         $dev = app()->isLocal() ? " 'unsafe-inline' http://localhost:5173 http://127.0.0.1:5173" : '';
         $devConnections = app()->isLocal() ? ' http://localhost:5173 http://127.0.0.1:5173 ws://localhost:5173 ws://127.0.0.1:5173' : '';
-        $response->headers->set('Content-Security-Policy', "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'{$dev}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'{$devConnections}; media-src 'self' data: blob:");
+        $response->headers->set('Content-Security-Policy', "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'{$dev}; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; font-src 'self' data:; connect-src 'self'{$devConnections}; media-src 'self' data: blob:");
         if ($request->is('api/*') && $request->user()) $response->headers->set('Cache-Control', 'no-store, private');
         if ($request->isSecure()) $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 
