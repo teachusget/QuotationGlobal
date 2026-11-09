@@ -2,6 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Keep the blog filters and editorial controls on deliberate, separate rows.
+   The category rail scrolls instead of shrinking/wrapping into the controls. */
+main.max-w-6xl.pb-10 > .mt-6.rounded-2xl > .flex.flex-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+main.max-w-6xl.pb-10 > .mt-6.rounded-2xl > .flex.flex-col > .flex.gap-2.overflow-x-auto {
+  min-width: 0;
+  flex-wrap: nowrap;
+  scrollbar-width: thin;
+}
+
+main.max-w-6xl.pb-10 > .mt-6.rounded-2xl > .flex.flex-col > .flex.gap-2.overflow-x-auto > button {
+  flex: 0 0 auto;
+}
+
+main.max-w-6xl.pb-10 > .mt-6.rounded-2xl > .flex.flex-col > .flex.flex-wrap.items-center {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+main.max-w-6xl.pb-10 > .mt-6.rounded-2xl > .flex.flex-col > .flex.flex-wrap.items-center > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 @layer base {
   * { @apply border-slate-200; }
   html { @apply scroll-smooth bg-canvas; }
