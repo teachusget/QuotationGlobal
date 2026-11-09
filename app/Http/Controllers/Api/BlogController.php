@@ -61,7 +61,14 @@ class BlogController extends Controller
     public function importImage(Request $request)
     {
         $url = $request->validate(['url' => ['required', 'url', 'max:2000']])['url'];
-        $response = Http::timeout(20)->withHeaders(['User-Agent' => 'Quotation Global Blog Image Importer'])->get($url);
+        $parts = parse_url($url);
+        abort_unless(in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true) && !empty($parts['host']), 422, 'Only HTTP and HTTPS image URLs are allowed.');
+        $host = strtolower($parts['host']);
+        abort_if($host === 'localhost' || str_ends_with($host, '.localhost') || $host === 'metadata.google.internal', 422, 'This image host is not allowed.');
+        foreach (gethostbynamel($host) ?: [] as $ip) {
+            abort_if(!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE), 422, 'This image host is not allowed.');
+        }
+        $response = Http::withoutRedirecting()->timeout(20)->withHeaders(['User-Agent' => 'Quotation Global Blog Image Importer'])->get($url);
         abort_unless($response->successful(), 422, 'The image URL could not be downloaded.');
         $contentType = strtolower((string) $response->header('Content-Type'));
         abort_unless(in_array($contentType, ['image/jpeg', 'image/png', 'image/webp'], true), 422, 'The URL must point directly to a JPG, PNG or WebP image.');
