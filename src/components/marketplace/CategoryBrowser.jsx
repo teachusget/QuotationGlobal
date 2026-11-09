@@ -15,6 +15,7 @@ export default function CategoryBrowser({ categories, selected, onSelect, loadin
       ...subcategory,
       filter: subcategory.name,
       parent: category.name,
+      logo_url: subcategory.logo_url || category.logo_url,
     }))
   ).sort((a, b) => (Number(b.click_count) || 0) - (Number(a.click_count) || 0)), [categories])
   const [visibleCount, setVisibleCount] = useState(12)
@@ -71,7 +72,9 @@ export default function CategoryBrowser({ categories, selected, onSelect, loadin
           onClick={() => onSelect(item.filter, item.id)}
           className={'flex min-h-[92px] flex-col items-center justify-center rounded-lg border px-2 text-center transition hover:-translate-y-0.5 hover:border-primary hover:shadow-floating ' + (active ? 'border-primary bg-blue-50 ring-1 ring-primary' : 'bg-white')}
         >
-          <span className={'grid h-9 w-9 place-items-center rounded-lg ' + (active ? 'bg-primary text-white' : 'bg-blue-50 text-primary')}><Icon className="h-4 w-4"/></span>
+          {item.logo_url
+            ? <img src={item.logo_url} alt="" className="h-8 w-8 object-contain"/>
+            : <span className={'grid h-9 w-9 place-items-center rounded-lg ' + (active ? 'bg-primary text-white' : 'bg-blue-50 text-primary')}><Icon className="h-4 w-4"/></span>}
           <span className="mt-2 line-clamp-2 text-[11px] font-semibold leading-4 text-slate-700">{item.name}</span>
         </button>
       })}
