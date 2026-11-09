@@ -20,7 +20,7 @@ class Service extends Model
             Cache::forget('marketplace:categories:v2');
         });
     }
-    protected $fillable = ['vendor_id', 'category_id', 'subcategory_id', 'industry_id', 'brand_id', 'name', 'sku', 'inventory_quantity', 'low_stock_threshold', 'track_inventory', 'features', 'image_data', 'certificates', 'service_type', 'deployment', 'ai_enabled', 'sell_globally', 'selling_countries', 'pricing_mode', 'price_from', 'monthly_price', 'discount_percent', 'billing_cycle'];
+    protected $fillable = ['vendor_id', 'category_id', 'subcategory_id', 'industry_id', 'brand_id', 'name', 'sku', 'inventory_quantity', 'low_stock_threshold', 'track_inventory', 'features', 'image_data', 'certificates', 'service_type', 'deployment', 'ai_enabled', 'sell_globally', 'selling_countries', 'pricing_mode', 'price_from', 'monthly_price', 'discount_percent', 'billing_cycle', 'view_count'];
 
     protected $casts = [
         'ai_enabled' => 'boolean',
@@ -28,6 +28,7 @@ class Service extends Model
         'selling_countries' => 'array',
         'certificates' => 'array',
         'track_inventory' => 'boolean',
+        'view_count' => 'integer',
     ];
 
     public function vendor() { return $this->belongsTo(Vendor::class); }

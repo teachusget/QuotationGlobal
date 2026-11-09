@@ -14,6 +14,7 @@ class Category extends Model
         static::deleted(function () { Cache::forget('marketplace:categories'); Cache::forget('marketplace:categories:v2'); });
     }
     protected $fillable = ['parent_id', 'name', 'slug', 'details', 'logo_data'];
+    protected $casts = ['click_count' => 'integer'];
 
     public function parent()
     {

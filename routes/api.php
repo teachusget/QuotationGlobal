@@ -38,6 +38,7 @@ Route::get('marketplace/services', [ServiceController::class, 'marketplace']);
 Route::get('marketplace/services/{service}', [ServiceController::class, 'marketplaceShow']);
 Route::get('marketplace/services/{service}/ratings', [ServiceController::class, 'ratings']);
 Route::get('marketplace/categories', [CategoryController::class, 'marketplace']);
+Route::post('marketplace/categories/{category}/click', [CategoryController::class, 'trackMarketplaceClick'])->middleware('throttle:api');
 Route::get('marketplace/brands', [BrandController::class, 'marketplace']);
 Route::get('marketplace/industries', [IndustryController::class, 'marketplace']);
 Route::get('marketplace/selling-countries', [SellingCountryController::class, 'show']);

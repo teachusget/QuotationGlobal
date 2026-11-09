@@ -46,8 +46,19 @@ class CategoryController extends Controller
                 'name' => $child->name,
                 'logo_url' => $child->logo_data ? url('/api/categories/'.$child->id.'/logo') : null,
                 'service_types' => $child->subcategoryServices->pluck('service_type')->unique()->values(),
+                'click_count' => (int) ($child->click_count ?? 0),
             ]),
         ])])->header('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    }
+
+    public function trackMarketplaceClick(Category $category)
+    {
+        abort_unless($category->parent_id, 404);
+
+        $category->increment('click_count');
+        Cache::forget('marketplace:categories:v2');
+
+        return response()->json(['tracked' => true]);
     }
 
     public function store(Request $request)

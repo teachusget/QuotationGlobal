@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 class ServiceController extends Controller
 {
@@ -45,18 +46,22 @@ class ServiceController extends Controller
     public function marketplace()
     {
         $version = Cache::get('marketplace:services:version', 1);
-        $data = Cache::remember("marketplace:services:v2:{$version}", 300, function () {
-            $services = Service::query()->whereHas('vendor', fn ($vendor) => $vendor->where('status', 'approved'))->select([
-                'id', 'vendor_id', 'category_id', 'subcategory_id', 'brand_id', 'name',
+        $hasViewCount = Schema::hasColumn('services', 'view_count');
+        $cacheMode = $hasViewCount ? 'popular' : 'legacy';
+        $columns = [
+                'id', 'vendor_id', 'category_id', 'subcategory_id', 'brand_id', 'name', 'view_count',
                 'service_type', 'pricing_mode', 'price_from', 'monthly_price', 'discount_percent',
                 'billing_cycle', 'ai_enabled', 'sell_globally', 'selling_countries', 'created_at',
-            ])->with([
+        ];
+        if (! $hasViewCount) $columns = array_values(array_diff($columns, ['view_count']));
+        $data = Cache::remember("marketplace:services:v2:{$cacheMode}:{$version}", 300, function () use ($columns, $hasViewCount) {
+            $services = Service::query()->whereHas('vendor', fn ($vendor) => $vendor->where('status', 'approved'))->select($columns)->with([
                 'vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'brand:id,name',
                 'brands:id,name', 'industries:id,name',
                 'specificationValues:id,service_id,specification_definition_id,value',
                 'specificationValues.definition:id,name,field_type,unit',
                 'images' => fn ($query) => $query->select('id', 'service_id', 'sort_order')->orderBy('sort_order')->limit(1),
-            ])->latest()->get();
+            ])->when($hasViewCount, fn ($query) => $query->orderByDesc('view_count'))->latest()->get();
             return $services->map(fn (Service $service) => $this->marketplaceResource($service))->values();
         });
 
@@ -75,6 +80,11 @@ class ServiceController extends Controller
         }
 
         abort_unless($isApproved || $canPreview, 404, 'This service is not available in the marketplace.');
+        if ($isApproved && Schema::hasColumn('services', 'view_count') && (!$viewer || $viewer->account_type === 'buyer')) {
+            Service::whereKey($service->id)->increment('view_count');
+            $version = Cache::get('marketplace:services:version', 1);
+            Cache::forget("marketplace:services:v2:popular:{$version}");
+        }
         $version = Cache::get('marketplace:services:version', 1);
         $cacheScope = $canPreview && ! $isApproved ? 'preview' : 'public';
         $data = Cache::remember("marketplace:service:{$cacheScope}:{$version}:{$service->id}", 300, function () use ($service) {

@@ -58,6 +58,12 @@ export function getMarketplaceCategories() {
     .finally(() => { marketplaceCategoriesPromise = undefined })
   return marketplaceCategoriesPromise
 }
+export function trackMarketplaceCategoryClick(id) {
+  return fetch('/api/marketplace/categories/' + id + '/click', {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  }).catch(() => {})
+}
 async function serialize(formData) {
   const payload = Object.fromEntries(formData.entries())
   const logo = formData.get('logo')

@@ -2,7 +2,7 @@ import { ArrowRight, BadgeCheck, Boxes, CalendarDays, FileText, GitCompareArrows
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
 import { getMarketplaceBrands } from '../api/brands'
-import { getMarketplaceCategories } from '../api/categories'
+import { getMarketplaceCategories, trackMarketplaceCategoryClick } from '../api/categories'
 import { getMarketplaceServices, prefetchMarketplaceService } from '../api/marketplace'
 import CategoryBrowser from '../components/marketplace/CategoryBrowser'
 import FeaturedAdsCarousel from '../components/marketplace/FeaturedAdsCarousel'
@@ -120,7 +120,22 @@ export default function LegacyMarketplacePage() {
     return (category === 'All' || service.category?.name === category || service.subcategory?.name === category) && (serviceType === 'All' || service.service_type === serviceType) && (brand === 'All' || brandNames.includes(brand)) && (industry === 'All' || industryNames.includes(industry)) && (deployment === 'All' || deploymentValues.includes(deployment)) && (companySize === 'All' || companySizeValues.includes(companySize)) && withinBudget && text.includes(query.trim().toLowerCase())
   })
   const clearFilters = () => { setCategory('All'); setBrand('All'); setIndustry('All'); setServiceType('All'); setDeployment('All'); setCompanySize('All'); setBudget('All'); setSellingCountry('Global'); localStorage.setItem('marketplace-selling-country', 'Global'); window.dispatchEvent(new CustomEvent('marketplace-country-selected', { detail: 'Global' })); setQuery('') }
-  const selectCategory = (value) => { setCategory(value); setBrand('All'); setIndustry('All'); setQuery(''); if (value !== 'All') document.getElementById('marketplace-products')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+  const selectCategory = (value, subcategoryId) => {
+    setCategory(value)
+    setBrand('All')
+    setIndustry('All')
+    setQuery('')
+    if (subcategoryId) {
+      setCategories((items) => items.map((categoryItem) => ({
+        ...categoryItem,
+        subcategories: (categoryItem.subcategories || []).map((subcategory) => subcategory.id === subcategoryId
+          ? { ...subcategory, click_count: (Number(subcategory.click_count) || 0) + 1 }
+          : subcategory),
+      })))
+      trackMarketplaceCategoryClick(subcategoryId)
+    }
+    if (value !== 'All') document.getElementById('marketplace-products')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
   const compareProducts = compareIds.map((id) => grouped.find((item) => String(item.id) === String(id))).filter(Boolean)
   const toggleCompare = (service) => {
     if (compareIds.map(String).includes(String(service.id))) { const next = compareIds.filter((id) => String(id) !== String(service.id)); setCompareIds(next); localStorage.setItem('compare-services', JSON.stringify(next)); setCompareNotice(''); return }
