@@ -13,7 +13,7 @@ export const createBlogCategory = (name) => request('blog/categories', body('POS
 export const updateBlogCategory = (id, payload) => request(`blog/categories/${id}`, body('PUT', payload))
 export const deleteBlogCategory = (id) => request(`blog/categories/${id}`, { method: 'DELETE' })
 export const getBlogPost = (slug, preview = false) => request(`blog/${slug}${preview ? '/preview' : ''}`)
-export const getBlogComments = (slug) => request(`blog/${slug}/comments`)
+export const getBlogComments = (slug, page = 1) => request(`blog/${slug}/comments?page=${page}`)
 export const likeBlogPost = (slug, reaction) => request(`blog/${slug}/like`, body('POST', { reaction }))
 export const addBlogComment = (slug, comment) => request(`blog/${slug}/comments`, body('POST', { body: comment }))
 export const createBlogPost = (payload) => request('blog', body('POST', payload))

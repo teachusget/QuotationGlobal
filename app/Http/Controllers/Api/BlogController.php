@@ -10,7 +10,6 @@ use App\Models\BlogLike;
 use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -64,17 +63,47 @@ class BlogController extends Controller
         $parts = parse_url($url);
         abort_unless(in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true) && !empty($parts['host']), 422, 'Only HTTP and HTTPS image URLs are allowed.');
         $host = strtolower($parts['host']);
-        abort_if($host === 'localhost' || str_ends_with($host, '.localhost') || $host === 'metadata.google.internal', 422, 'This image host is not allowed.');
-        foreach (gethostbynamel($host) ?: [] as $ip) {
+        abort_if(isset($parts['user']) || isset($parts['pass']) || filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6), 422, 'This image URL is not allowed.');
+        $port = $parts['port'] ?? (strtolower($parts['scheme']) === 'https' ? 443 : 80);
+        abort_unless(in_array($port, [80, 443], true), 422, 'This image port is not allowed.');
+        abort_unless(filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) || (str_contains($host, '.') && filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)), 422, 'This image host is not allowed.');
+        $addresses = filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) ? [$host] : (gethostbynamel($host) ?: []);
+        abort_if(!$addresses, 422, 'This image host could not be resolved.');
+        foreach ($addresses as $ip) {
             abort_if(!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE), 422, 'This image host is not allowed.');
         }
-        $response = Http::withoutRedirecting()->timeout(20)->withHeaders(['User-Agent' => 'Quotation Global Blog Image Importer'])->get($url);
-        abort_unless($response->successful(), 422, 'The image URL could not be downloaded.');
-        $contentType = strtolower((string) $response->header('Content-Type'));
+        abort_unless(extension_loaded('curl') && defined('CURLOPT_RESOLVE'), 503, 'Image import is unavailable on this server.');
+        $body = '';
+        $tooLarge = false;
+        $handle = curl_init($url);
+        curl_setopt_array($handle, [
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_PROXY => '',
+            CURLOPT_RESOLVE => ["{$host}:{$port}:{$addresses[0]}"],
+            CURLOPT_USERAGENT => 'Quotation Global Blog Image Importer',
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_WRITEFUNCTION => function ($curl, $chunk) use (&$body, &$tooLarge) {
+                if (strlen($body) + strlen($chunk) > 8 * 1024 * 1024) { $tooLarge = true; return 0; }
+                $body .= $chunk;
+                return strlen($chunk);
+            },
+        ]);
+        $downloaded = curl_exec($handle);
+        $status = curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        $contentType = strtolower(trim(explode(';', (string) curl_getinfo($handle, CURLINFO_CONTENT_TYPE))[0]));
+        curl_close($handle);
+        abort_if($tooLarge, 422, 'The image is larger than 8 MB.');
+        abort_unless($downloaded && $status >= 200 && $status < 300, 422, 'The image URL could not be downloaded.');
         abort_unless(in_array($contentType, ['image/jpeg', 'image/png', 'image/webp'], true), 422, 'The URL must point directly to a JPG, PNG or WebP image.');
-        $body = $response->body(); abort_if(strlen($body) > 8 * 1024 * 1024, 422, 'The image is larger than 8 MB.');
+        $imageInfo = @getimagesizefromstring($body);
+        abort_unless($imageInfo && ($imageInfo['mime'] ?? '') === $contentType, 422, 'The downloaded file is not a valid image.');
         $extension = match ($contentType) { 'image/png' => 'png', 'image/webp' => 'webp', default => 'jpg' };
-        $path = 'blog/covers/'.Str::random(40).'.'.$extension; Storage::disk('public')->put($path, $body);
+        $path = 'blog/covers/'.Str::random(40).'.'.$extension;
+        abort_unless(Storage::disk('public')->put($path, $body), 500, 'The image could not be saved.');
         return response()->json(['message' => 'Image imported.', 'url' => '/storage/'.ltrim($path, '/')], 201);
     }
 
@@ -128,13 +157,18 @@ class BlogController extends Controller
         return response()->json(['data' => $blogPost->load('author:id,name')]);
     }
 
-    public function comments(BlogPost $blogPost)
+    public function comments(Request $request, BlogPost $blogPost)
     {
         abort_if($blogPost->status !== 'published' || !$blogPost->published_at, 404);
+        $viewer = $request->user('sanctum');
+        $currentReaction = $viewer
+            ? BlogLike::where('blog_post_id', $blogPost->id)->where('user_id', $viewer->id)->value('reaction')
+            : null;
         return response()->json([
-            'data' => BlogComment::where('blog_post_id', $blogPost->id)->with('user:id,name')->latest()->get(),
+            'data' => BlogComment::where('blog_post_id', $blogPost->id)->with('user:id,name')->latest()->paginate(20),
             'likes_count' => BlogLike::where('blog_post_id', $blogPost->id)->where('reaction', 'like')->count(),
             'dislikes_count' => BlogLike::where('blog_post_id', $blogPost->id)->where('reaction', 'dislike')->count(),
+            'current_reaction' => $currentReaction,
         ]);
     }
 
@@ -181,6 +215,7 @@ class BlogController extends Controller
 
     public function update(Request $request, BlogPost $blogPost)
     {
+        abort_unless($request->user()->can('blog.manage') || $blogPost->author_id === $request->user()->id, 403);
         $data = $this->validated($request); $data['slug'] = BlogPost::makeSlug($data['title'], $blogPost->id);
         if ($data['status'] === 'published' && !$blogPost->published_at) $data['published_at'] = now();
         if ($data['status'] === 'draft') $data['published_at'] = null;
@@ -190,6 +225,7 @@ class BlogController extends Controller
 
     public function destroy(Request $request, BlogPost $blogPost)
     {
+        abort_unless($request->user()->can('blog.manage') || $blogPost->author_id === $request->user()->id, 403);
         $blogPost->delete(); Audit::record($request, 'blog.post_deleted', $blogPost); return response()->json(['message' => 'Blog post deleted.']);
     }
 
