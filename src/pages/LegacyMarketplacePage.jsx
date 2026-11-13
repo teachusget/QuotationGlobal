@@ -21,7 +21,7 @@ function Link({ to, onMouseEnter, onFocus, onTouchStart, ...props }) {
 }
 
 function MarketplaceProductCard({ service, selected, disabled, onCompare }) {
-  return <article className={`group relative flex h-full min-w-0 flex-col overflow-hidden rounded-xl border bg-white transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-floating ${selected ? 'border-primary ring-2 ring-primary/20' : ''}`}>
+  return <article className={`marketplace-product-card group relative flex h-full min-w-0 flex-col overflow-hidden rounded-xl border bg-white transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-floating ${selected ? 'border-primary ring-2 ring-primary/20' : ''}`}>
     <button type="button" disabled={disabled && !selected} onClick={() => onCompare(service)} className={`absolute right-3 top-3 z-10 inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-xs font-bold shadow-sm transition ${selected ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white/95 text-slate-700 hover:border-primary hover:text-primary'} disabled:cursor-not-allowed disabled:opacity-45`}><span className={`grid h-4 w-4 place-items-center rounded border ${selected ? 'border-white bg-white text-primary' : 'border-slate-300'}`}>{selected && <CheckMark/>}</span>{selected ? 'Selected' : 'Compare'}</button>
     <Link to={`/marketplace/services/${service.id}`} className="flex h-full flex-col"><div className="grid h-48 shrink-0 place-items-center overflow-hidden border-b bg-gradient-to-br from-white to-slate-50 p-4">{service.images?.[0]?.image_data ? <img loading="lazy" src={service.images[0].image_data} alt={service.name} className="h-full w-full object-contain"/> : <Boxes className="h-10 w-10 text-primary/50"/>}</div><div className="flex flex-1 flex-col p-5"><div className="flex items-start justify-between gap-3"><span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold capitalize text-primary">{service.service_type}</span>{service.category?.name && <span className="max-w-[55%] truncate text-xs font-semibold text-slate-400">{service.category.name}</span>}</div><h3 className="mt-3 min-h-10 text-base font-bold text-slate-900 group-hover:text-primary">{service.name}</h3><p className="mt-1 text-xs text-slate-500">by {service.vendor?.company_name || service.vendor?.name || 'Verified vendor'}</p><div className="mt-auto pt-4"><p className="text-sm font-bold">{service.plans[0] ? `Starting From $${Number(service.plans[0].price_from).toLocaleString()}` : 'Price on request'}</p><p className="mt-1 text-xs text-slate-500">{service.plans.length} pricing plan{service.plans.length === 1 ? '' : 's'} available</p><span className="mt-5 inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-white">View {service.service_type === 'services' ? 'service' : 'product'}<ArrowRight className="h-3.5 w-3.5"/></span></div></div></Link>
   </article>
@@ -101,14 +101,14 @@ export default function LegacyMarketplacePage() {
   }, {})), [services])
   const countryEligible = sellingCountry === 'Global' ? grouped : grouped.filter((service) => service.sell_globally && (service.selling_countries || []).includes(sellingCountry))
   const carouselServices = useMemo(() => [...new Map([...countryEligible, ...adCatalogServices].map((service) => [Number(service.id), service])).values()], [countryEligible, adCatalogServices])
-  const bannerAds = Array.isArray(featuredAds) ? featuredAds : countryEligible.slice(0, 5).map((service) => ({ service_id: service.id, duration_seconds: 6 }))
+  const bannerAds = useMemo(() => Array.isArray(featuredAds) ? featuredAds : countryEligible.slice(0, 5).map((service) => ({ service_id: service.id, duration_seconds: 6 })), [featuredAds, countryEligible])
   const advancedOptions = useMemo(() => {
     const industries = [...new Set(grouped.flatMap((service) => (service.industries || []).map((item) => item.name)))].sort()
     const deployments = [...new Set(grouped.flatMap((service) => specificationValues(service, /deployment|hosting/i)))].sort()
     const companySizes = [...new Set(grouped.flatMap((service) => specificationValues(service, /company size|users|employees|user capacity/i)))].sort()
     return { industries, deployments, companySizes }
   }, [grouped])
-  const visible = countryEligible.filter((service) => {
+  const visible = useMemo(() => countryEligible.filter((service) => {
     const allSpecifications = (service.specification_values || []).map((item) => `${item.definition?.name || ''} ${item.value || ''}`).join(' ')
     const text = `${service.name} ${service.vendor?.company_name || ''} ${service.category?.name || ''} ${service.subcategory?.name || ''} ${service.service_type} ${(service.brands || []).map((item) => item.name).join(' ')} ${(service.industries || []).map((item) => item.name).join(' ')} ${allSpecifications}`.toLowerCase()
     const brandNames = [...(service.brands || []), service.brand].filter(Boolean).map((item) => item.name)
@@ -118,7 +118,7 @@ export default function LegacyMarketplacePage() {
     const prices = (service.plans || []).map((plan) => Number(plan.price_from)).filter(Number.isFinite)
     const withinBudget = budget === 'All' || (prices.length > 0 && Math.min(...prices) <= Number(budget))
     return (category === 'All' || service.category?.name === category || service.subcategory?.name === category) && (serviceType === 'All' || service.service_type === serviceType) && (brand === 'All' || brandNames.includes(brand)) && (industry === 'All' || industryNames.includes(industry)) && (deployment === 'All' || deploymentValues.includes(deployment)) && (companySize === 'All' || companySizeValues.includes(companySize)) && withinBudget && text.includes(query.trim().toLowerCase())
-  })
+  }), [countryEligible, category, serviceType, brand, industry, deployment, companySize, budget, query])
   const clearFilters = () => { setCategory('All'); setBrand('All'); setIndustry('All'); setServiceType('All'); setDeployment('All'); setCompanySize('All'); setBudget('All'); setSellingCountry('Global'); localStorage.setItem('marketplace-selling-country', 'Global'); window.dispatchEvent(new CustomEvent('marketplace-country-selected', { detail: 'Global' })); setQuery('') }
   const selectCategory = (value, subcategoryId) => {
     setCategory(value)

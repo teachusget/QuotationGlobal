@@ -25,10 +25,10 @@ function LayoutFrame({ isBuyer = false, theme = {} }) {
     return () => query.removeEventListener('change', sync)
   }, [])
 
-  return <div className={`${isBuyer ? `marketplace-public-shell marketplace-shell-${theme.preset || 'neon-nexus'}` : ''} min-h-screen bg-canvas`} style={isBuyer ? { '--market-primary': theme.primary, '--market-secondary': theme.secondary, '--market-canvas': theme.canvas, '--market-surface': theme.surface, '--market-text': theme.text } : undefined}>
+  return <div className={`${isBuyer ? `marketplace-public-shell marketplace-shell-${theme.preset || 'neon-nexus'}` : ''} min-h-screen overflow-x-hidden bg-canvas`} style={isBuyer ? { '--market-primary': theme.primary, '--market-secondary': theme.secondary, '--market-canvas': theme.canvas, '--market-surface': theme.surface, '--market-text': theme.text } : undefined}>
     <Header onMenuClick={() => setMobileOpen(true)}/>
     {!isBuyer && <><div className={`fixed bottom-0 left-0 top-16 z-30 hidden border-r bg-white transition-[width] duration-180 md:block ${collapsed ? 'w-[72px]' : 'w-60'}`}><Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)}/></div><MobileSidebar open={mobileOpen} onClose={closeMobile}/></>}
-    <div className={`flex min-h-screen flex-col pt-16 transition-[margin] duration-180 ${isBuyer ? '' : collapsed ? 'md:ml-[72px]' : 'md:ml-60'}`}><main className={`flex-1 ${isBuyer ? 'mx-auto w-full max-w-[1440px] px-4 py-3 sm:px-5 lg:px-7 lg:py-4' : 'mx-auto w-full max-w-[1680px] px-4 py-5 sm:px-5 lg:px-7 lg:py-7'}`}><Outlet/></main>{isBuyer && <Footer/>}</div>
+    <div className={`flex min-h-screen min-w-0 flex-col pt-16 transition-[margin] duration-180 ${isBuyer ? '' : collapsed ? 'md:ml-[72px]' : 'md:ml-60'}`}><main className={`min-w-0 flex-1 ${isBuyer ? 'mx-auto w-full max-w-[1440px] px-3 py-3 sm:px-5 lg:px-7 lg:py-4 2xl:px-10' : 'mx-auto w-full max-w-[1680px] px-3 py-4 sm:px-5 lg:px-7 lg:py-7 2xl:px-10'}`}><Outlet/></main>{isBuyer && <Footer/>}</div>
   </div>
 }
 

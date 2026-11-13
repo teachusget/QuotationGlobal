@@ -1165,6 +1165,23 @@ form[aria-label="Request a quotation"] > div:last-child {
   object-position: center !important;
   transform: none !important;
 }
+
+/* Defer layout/paint work for marketplace cards that are below the fold. */
+.marketplace-product-card,
+.marketplace-renderer a[data-market-surface] {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 25rem;
+}
+
+@media (max-width: 639px) {
+  .legacy-marketplace-hero h1 { font-size: clamp(2rem, 10vw, 3rem); }
+  .legacy-marketplace-hero .hero-stats { grid-template-columns: 1fr; }
+  .legacy-marketplace-hero .hero-discovery { overflow-x: auto; flex-wrap: nowrap; padding-bottom: .25rem; }
+  .legacy-marketplace-hero .hero-discovery > * { flex: 0 0 auto; }
+  .featured-ads-carousel .grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+  .featured-ads-carousel .grid-cols-4 > div:nth-child(2) { border-right: 0; }
+  .featured-ads-carousel .grid-cols-4 > div:nth-child(n+3) { margin-top: .5rem; }
+}
 /* Show missing Add Service fields only after the user attempts to save. */
 .service-form.was-validated :is(input, select, textarea):invalid {
   border-color: #ef4444 !important;
@@ -1289,4 +1306,52 @@ form[aria-label="Request a quotation"] > div:last-child {
   max-height: 100% !important;
   object-fit: contain !important;
   object-position: center;
+}
+
+/* Responsive foundation: protect every route from fixed-width children and
+   keep the reading column comfortable on tablets and large displays. */
+*, *::before, *::after { box-sizing: border-box; }
+img, svg, video, canvas { max-width: 100%; }
+main, main > *, section, article, form, dialog { min-width: 0; }
+
+.ui-page-header, .ui-toolbar, .ui-card, .ui-table-shell { max-width: 100%; }
+.ui-table-shell, .overflow-x-auto { scrollbar-width: thin; overscroll-behavior-inline: contain; }
+input, select, textarea, button { max-width: 100%; }
+textarea { overflow-wrap: anywhere; }
+
+@media (max-width: 767px) {
+  body { font-size: .875rem; }
+  .app-header { padding-inline: .5rem !important; }
+  .app-header > div { gap: .25rem; }
+  .app-header .app-header-search,
+  .app-header form { min-width: 0; }
+  .ui-page-title, .ui-page-header h1 { font-size: 1.375rem; }
+  .ui-page-description { line-height: 1.45; }
+  .ui-page-header { gap: 1rem; }
+  .ui-page-header > div[class*="flex"] { gap: .75rem; }
+  .ui-page-header > div[class*="flex"] > div[class*="grid"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ui-page-header > div[class*="flex"] > div[class*="grid"] > * { min-width: 0; padding-inline: .5rem; }
+  .ui-toolbar > div:first-child { width: 100%; min-width: 0; overflow-x: auto; }
+  .ui-toolbar > div:first-child button { flex: 0 0 auto; }
+  .ui-toolbar label { min-width: 0 !important; width: 100%; }
+  .ui-table-shell { overflow-x: auto; }
+  .ui-table-shell table { min-width: 640px; }
+  .ui-table-shell:has(table[class*="data-table"]) table { min-width: 0; }
+  .swal2-container .swal2-popup { width: calc(100vw - 1rem); }
+  [role="dialog"] > section, [role="dialog"] > form { max-width: calc(100vw - 1rem); }
+  .marketplace-public-shell > header { padding-inline: .75rem; }
+  .marketplace-public-shell > main { padding-inline: .75rem; }
+  .marketplace-public-shell footer { padding-inline: .75rem; }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  .ui-page-header { padding-inline: 1rem; }
+  .ui-page-header > div[class*="flex"] { max-width: 48%; }
+  .ui-page-header > div[class*="flex"] > div[class*="grid"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ui-toolbar { gap: .75rem; }
+}
+
+@media (min-width: 1600px) {
+  body { font-size: .9375rem; }
+  .ui-page-header, .ui-toolbar, .ui-card, .ui-table-shell { border-radius: 1rem; }
 }

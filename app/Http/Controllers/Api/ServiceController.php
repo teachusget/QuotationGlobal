@@ -109,15 +109,25 @@ class ServiceController extends Controller
             ->header('Cache-Control', $canPreview && ! $isApproved ? 'private, no-store' : 'public, max-age=120, stale-while-revalidate=300');
     }
 
-    public function marketplaceImage(ServiceImage $serviceImage)
+    public function marketplaceImage(Request $request, ServiceImage $serviceImage)
     {
         // Marketplace seed artwork is generated as a controlled SVG data URI. User
         // uploads remain restricted to PNG/JPEG/WebP by store() validation.
         abort_unless($serviceImage->image_data && preg_match('#^data:(image/(?:png|jpeg|webp|svg\+xml));base64,(.+)$#', $serviceImage->image_data, $parts), 404);
 
+        // Image rows are immutable from the marketplace point of view: updates
+        // create a new row. Use a long-lived validator so cards do not decode and
+        // download the same base64 image on every visit.
+        $etag = sprintf('"marketplace-image-%d-%s"', $serviceImage->id, optional($serviceImage->updated_at)->timestamp ?: '1');
+        $headers = [
+            'Content-Type' => $parts[1],
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+            'ETag' => $etag,
+        ];
+        if (trim((string) $request->header('If-None-Match')) === $etag) return response('', 304, $headers);
+
         return response(base64_decode($parts[2]))
-            ->header('Content-Type', $parts[1])
-            ->header('Cache-Control', 'public, max-age=86400');
+            ->withHeaders($headers);
     }
 
     public function ratings(Service $service)

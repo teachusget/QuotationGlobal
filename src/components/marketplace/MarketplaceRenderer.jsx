@@ -13,7 +13,7 @@ const spacingClass = { compact: 'gap-y-2', comfortable: 'gap-y-5', spacious: 'ga
 function MediaImage({ id, media, alt = '', className = '' }) {
   if (!id || !media?.[id]) return null
   const asset = media[id]
-  return <img loading="lazy" decoding="async" src={asset.url} width={asset.width} height={asset.height} alt={asset.alt_text || alt} className={className}/>
+  return <img loading="lazy" decoding="async" src={asset.url} width={asset.width || undefined} height={asset.height || undefined} alt={asset.alt_text || alt} className={className}/>
 }
 
 function SafeLink({ to = '#', preview, children, className = '', ...props }) {
