@@ -618,20 +618,20 @@ form[class*="max-h-[92vh]"] div:has(> label > textarea[maxlength="5000"]) { disp
 }
 
 .featured-ad-main {
-  min-height: 10.75rem;
-  padding: 1.15rem 1.35rem !important;
+  min-height: 10rem;
+  padding: 1rem 1.15rem !important;
   background:
     radial-gradient(circle at 85% 15%, rgb(196 181 253 / 0.35), transparent 32%),
     linear-gradient(145deg, #f8fbff, #eef4ff) !important;
 }
 
 .featured-ad-main > div:first-of-type {
-  width: 4rem !important;
-  height: 4rem !important;
+  width: 3.5rem !important;
+  height: 3.5rem !important;
 }
 
 .featured-ad-main > h2 {
-  margin-top: 0.8rem !important;
+  margin-top: 0.65rem !important;
 }
 
 .featured-ads-carousel > .grid.grid-cols-4 {
@@ -685,6 +685,41 @@ form[class*="max-h-[92vh]"] div:has(> label > textarea[maxlength="5000"]) { disp
 }
 
 @media (max-width: 640px) {
+  .legacy-marketplace-hero {
+    padding-inline: 1rem !important;
+    padding-top: 1.25rem !important;
+  }
+
+  .legacy-marketplace-hero .hero-discovery {
+    margin-bottom: 1rem;
+  }
+
+  .legacy-marketplace-hero .hero-discovery + div {
+    margin-top: 1rem !important;
+  }
+
+  .legacy-marketplace-hero .hero-ad-stage {
+    min-height: auto !important;
+    margin-top: 1.5rem;
+    padding: 0.25rem 0 0.5rem;
+  }
+
+  .legacy-marketplace-hero .hero-ad-stage .featured-ads-carousel {
+    width: 100%;
+    max-width: none;
+    margin-inline: 0 !important;
+    transform: none !important;
+  }
+
+  .legacy-marketplace-hero .hero-ad-stage .hero-neon-cube,
+  .legacy-marketplace-hero .hero-ad-stage .hero-neon-orb {
+    display: none;
+  }
+
+  .legacy-marketplace-hero .hero-stats {
+    margin-top: 1rem !important;
+  }
+
   .legacy-marketplace-hero > div:first-child {
     width: 100%;
     overflow-x: auto;
@@ -831,14 +866,14 @@ form[class*="max-h-[92vh]"] div:has(> label > textarea[maxlength="5000"]) { disp
   background: linear-gradient(90deg, #3157e8, #14b8a6);
 }
 
-.marketplace-shell-orbit-glass-2026 .marketplace-category-browser button[class*='min-h-[92px]'] {
+.marketplace-shell-orbit-glass-2026 .marketplace-category-browser button[class*='min-h-[80px]'] {
   border-color: transparent !important;
   border-radius: 1rem !important;
   background: #f7f9fd !important;
   box-shadow: inset 0 0 0 1px rgb(148 163 184 / 0.12);
 }
 
-.marketplace-shell-orbit-glass-2026 .marketplace-category-browser button[class*='min-h-[92px]']:hover {
+.marketplace-shell-orbit-glass-2026 .marketplace-category-browser button[class*='min-h-[80px]']:hover {
   border-color: rgb(49 87 232 / 0.22) !important;
   background: #fff !important;
   box-shadow: 0 16px 28px -20px rgb(49 87 232 / 0.38);
@@ -1171,6 +1206,65 @@ form[aria-label="Request a quotation"] > div:last-child {
 .marketplace-renderer a[data-market-surface] {
   content-visibility: auto;
   contain-intrinsic-size: 0 25rem;
+}
+
+/* Keep marketplace catalog cards dense enough to scan without wasting vertical space. */
+.marketplace-page-neon-nexus .marketplace-product-card > a > div:first-child,
+.marketplace-page-orbit-glass-2026 .marketplace-product-card > a > div:first-child {
+  height: 10rem !important;
+  min-height: 10rem !important;
+  padding: 0.75rem !important;
+}
+
+.marketplace-page-neon-nexus .marketplace-product-card > a > div:nth-child(2),
+.marketplace-page-orbit-glass-2026 .marketplace-product-card > a > div:nth-child(2) {
+  padding: 1rem !important;
+}
+
+.marketplace-page-neon-nexus .marketplace-product-card h3,
+.marketplace-page-orbit-glass-2026 .marketplace-product-card h3 {
+  min-height: 2.25rem;
+  margin-top: 0.5rem;
+}
+
+.marketplace-page-neon-nexus .marketplace-product-card .mt-auto,
+.marketplace-page-orbit-glass-2026 .marketplace-product-card .mt-auto {
+  padding-top: 0.75rem;
+}
+
+.marketplace-page-neon-nexus .marketplace-product-card .mt-5,
+.marketplace-page-orbit-glass-2026 .marketplace-product-card .mt-5 {
+  margin-top: 0.75rem;
+}
+
+.marketplace-page-neon-nexus #marketplace-products,
+.marketplace-page-orbit-glass-2026 #marketplace-products {
+  padding: 1rem !important;
+}
+
+.marketplace-page-neon-nexus > .mt-10,
+.marketplace-page-orbit-glass-2026 > .mt-10 {
+  margin-top: 2rem;
+}
+
+.marketplace-renderer a[data-market-surface] > div:first-child {
+  height: 10rem !important;
+  padding: 0.75rem !important;
+}
+
+.marketplace-renderer a[data-market-surface] > div:nth-child(2) {
+  padding: 0.875rem !important;
+}
+
+.marketplace-renderer article[data-market-surface] {
+  padding: 1rem !important;
+}
+
+@media (min-width: 640px) {
+  .marketplace-page-neon-nexus #marketplace-products,
+  .marketplace-page-orbit-glass-2026 #marketplace-products {
+    padding: 1.25rem !important;
+  }
 }
 
 @media (max-width: 639px) {

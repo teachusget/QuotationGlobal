@@ -31,27 +31,27 @@ export default function CategoryBrowser({ categories, selected, onSelect, loadin
   const additionalRows = visibleTiles.slice(12)
   const hasMore = visibleCount < filteredTiles.length
 
-  return <div className="marketplace-category-browser mt-9 rounded-2xl border bg-white px-4 py-6 shadow-subtle sm:px-6">
+  return <div className="marketplace-category-browser mt-4 rounded-2xl border bg-white px-4 py-5 shadow-subtle sm:px-5">
     <div className="text-center">
       <p className="text-xs font-bold uppercase tracking-wider text-primary">Browse faster</p>
       <h2 className="mt-1 text-2xl font-bold">Popular solution subcategories</h2>
       <p className="mt-1 text-xs text-slate-500">Browse solutions by subcategory.</p>
     </div>
-    <div className="mx-auto mt-6 max-w-xl">
+    <div className="mx-auto mt-4 max-w-xl">
       <label className="relative block">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search subcategories..." aria-label="Search subcategories" className="h-10 w-full rounded-lg border bg-slate-50 pl-9 pr-3 text-xs outline-none transition focus:border-primary focus:bg-white" />
       </label>
     </div>
-    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-      {loading && !tiles.length ? Array.from({ length: 12 }, (_, index) => <div key={index} className="flex min-h-[92px] flex-col items-center justify-center rounded-lg border bg-white"><span className="h-9 w-9 ui-skeleton rounded-lg bg-slate-100"/><span className="mt-2 h-2.5 w-16 ui-skeleton rounded bg-slate-100"/></div>) : firstRows.map((item, index) => {
+    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+      {loading && !tiles.length ? Array.from({ length: 12 }, (_, index) => <div key={index} className="flex min-h-[80px] flex-col items-center justify-center rounded-lg border bg-white"><span className="h-9 w-9 ui-skeleton rounded-lg bg-slate-100"/><span className="mt-2 h-2.5 w-16 ui-skeleton rounded bg-slate-100"/></div>) : firstRows.map((item, index) => {
         const Icon = icons[index % icons.length]
         const active = selected === item.filter
         return <button
           type="button"
           key={`${item.parent || 'category'}-${item.id}`}
           onClick={() => onSelect(item.filter, item.id)}
-          className={`group flex min-h-[92px] flex-col items-center justify-center rounded-lg border px-2 py-3 text-center transition ${active ? 'border-primary bg-blue-50 ring-1 ring-primary' : 'bg-white hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-floating'}`}
+          className={`group flex min-h-[80px] flex-col items-center justify-center rounded-lg border px-2 py-2.5 text-center transition ${active ? 'border-primary bg-blue-50 ring-1 ring-primary' : 'bg-white hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-floating'}`}
         >
           {item.logo_url
             ? <img src={item.logo_url} alt="" className="h-8 w-8 object-contain"/>
@@ -70,7 +70,7 @@ export default function CategoryBrowser({ categories, selected, onSelect, loadin
           type="button"
           key={item.id}
           onClick={() => onSelect(item.filter, item.id)}
-          className={'flex min-h-[92px] flex-col items-center justify-center rounded-lg border px-2 text-center transition hover:-translate-y-0.5 hover:border-primary hover:shadow-floating ' + (active ? 'border-primary bg-blue-50 ring-1 ring-primary' : 'bg-white')}
+          className={'flex min-h-[80px] flex-col items-center justify-center rounded-lg border px-2 py-2.5 text-center transition hover:-translate-y-0.5 hover:border-primary hover:shadow-floating ' + (active ? 'border-primary bg-blue-50 ring-1 ring-primary' : 'bg-white')}
         >
           {item.logo_url
             ? <img src={item.logo_url} alt="" className="h-8 w-8 object-contain"/>
@@ -79,7 +79,7 @@ export default function CategoryBrowser({ categories, selected, onSelect, loadin
         </button>
       })}
     </div>}
-    {hasMore && <div className="mt-5 text-center">
+    {hasMore && <div className="mt-4 text-center">
       <button type="button" onClick={() => setVisibleCount(filteredTiles.length)} className="inline-flex h-9 items-center gap-2 rounded-md border border-primary px-5 text-xs font-semibold text-primary hover:bg-blue-50">
         <LoaderCircle className="h-4 w-4" />View all
       </button>
