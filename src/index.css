@@ -202,6 +202,21 @@ form[aria-label="Service editor"] > div.mt-5.rounded-md.border.p-3:has(> h3:only
   .auth-login-content > p:last-child { margin-top: 0 !important; padding-top: .125rem !important; font-size: .625rem !important; }
 }
 
+/* Fluid sizing: the complete login flow scales with the available viewport height. */
+.auth-scroll-panel { padding-block: clamp(.5rem, 2.2vh, 2rem) !important; }
+.auth-login-intro { margin-top: clamp(.5rem, 3vh, 1.5rem) !important; }
+.auth-login-intro h1 { margin-top: clamp(.25rem, 1vh, 1rem) !important; font-size: clamp(1.25rem, 3.1vh, 1.5rem) !important; line-height: 1.15 !important; }
+.auth-login-intro p { margin-top: clamp(.125rem, .8vh, .5rem) !important; font-size: clamp(.75rem, 1.8vh, .875rem) !important; }
+.auth-login-form { margin-top: clamp(.5rem, 2.2vh, 1.5rem) !important; row-gap: clamp(.25rem, 1.2vh, 1rem) !important; }
+.auth-login-form label { font-size: clamp(.6875rem, 1.55vh, .75rem) !important; }
+.auth-login-form input { height: clamp(2.125rem, 5.8vh, 2.75rem) !important; font-size: clamp(.75rem, 1.8vh, .875rem) !important; }
+.auth-login-form button[type="submit"] { height: clamp(2.125rem, 5.8vh, 2.75rem) !important; font-size: clamp(.75rem, 1.8vh, .875rem) !important; }
+.auth-login-divider { margin-top: clamp(.5rem, 1.8vh, 1.25rem) !important; }
+.auth-login-social { margin-top: clamp(.375rem, 1.2vh, .75rem) !important; }
+.auth-login-social button { height: clamp(2.125rem, 5.8vh, 2.75rem) !important; font-size: clamp(.6875rem, 1.55vh, .75rem) !important; }
+.auth-login-links { margin-top: clamp(.375rem, 1.8vh, 1.25rem) !important; row-gap: clamp(0px, .7vh, .5rem) !important; font-size: clamp(.6875rem, 1.55vh, .75rem) !important; }
+.auth-login-content > p:last-child { margin-top: 0 !important; padding-top: clamp(.125rem, .8vh, .5rem) !important; font-size: clamp(.625rem, 1.35vh, .6875rem) !important; }
+
 @keyframes brand-marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
