@@ -78,6 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('notification-states/read', [UserNotificationStateController::class, 'markRead']);
     Route::post('notification-states/clear', [UserNotificationStateController::class, 'clear']);
     Route::get('auth/user', [AuthController::class, 'user']);
+    Route::post('auth/complete-social-profile', [AuthController::class, 'completeSocialProfile']);
     Route::patch('auth/profile', [AuthController::class, 'updateProfile']);
     Route::patch('auth/company', [AuthController::class, 'updateCompany']);
     Route::patch('auth/password', [AuthController::class, 'updatePassword']);

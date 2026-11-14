@@ -33,7 +33,7 @@ class AuthController extends Controller
         $request->session()->put('social_auth_state', ['value' => $state, 'provider' => $provider, 'role' => $role, 'registration_type' => $registrationType]);
         $redirectUri = $request->getSchemeAndHttpHost().'/auth/'.$provider.'/callback';
         $params = $provider === 'google'
-            ? ['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid email profile', 'state' => $state, 'access_type' => 'online', 'prompt' => 'select_account']
+            ? ['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid email profile https://www.googleapis.com/auth/user.phonenumbers.read', 'state' => $state, 'access_type' => 'online', 'prompt' => 'select_account']
             : ['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid profile email', 'state' => $state];
         $endpoint = $provider === 'google' ? 'https://accounts.google.com/o/oauth2/v2/auth' : 'https://www.linkedin.com/oauth/v2/authorization';
         return redirect()->away($endpoint.'?'.http_build_query($params));
@@ -50,9 +50,15 @@ class AuthController extends Controller
         $tokenUrl = $provider === 'google' ? 'https://oauth2.googleapis.com/token' : 'https://www.linkedin.com/oauth/v2/accessToken';
         $tokenResponse = Http::asForm()->post($tokenUrl, ['grant_type' => 'authorization_code', 'code' => $request->query('code'), 'client_id' => $clientId, 'client_secret' => $clientSecret, 'redirect_uri' => $redirectUri]);
         if (!$tokenResponse->successful()) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('Unable to complete social login.'));
-        $profileResponse = Http::withToken($tokenResponse->json('access_token'))->get($provider === 'google' ? 'https://openidconnect.googleapis.com/v1/userinfo' : 'https://api.linkedin.com/v2/userinfo');
+        $accessToken = $tokenResponse->json('access_token');
+        $profileResponse = Http::withToken($accessToken)->get($provider === 'google' ? 'https://openidconnect.googleapis.com/v1/userinfo' : 'https://api.linkedin.com/v2/userinfo');
         if (!$profileResponse->successful()) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('Unable to read the social profile.'));
         $profile = $profileResponse->json(); $providerId = (string) ($profile['sub'] ?? $profile['id'] ?? ''); $email = strtolower(trim((string) ($profile['email'] ?? '')));
+        $phone = trim((string) ($profile['phone_number'] ?? $profile['phone'] ?? ''));
+        if ($provider === 'google') {
+            $phoneResponse = Http::withToken($accessToken)->get('https://people.googleapis.com/v1/people/me', ['personFields' => 'phoneNumbers']);
+            $phone = trim((string) ($phoneResponse->json('phoneNumbers.0.value') ?? $phone));
+        }
         $name = trim((string) ($profile['name'] ?? trim(($profile['given_name'] ?? '').' '.($profile['family_name'] ?? ''))));
         if (!$providerId || !$email) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('The social provider did not return a usable email address.'));
         $social = SocialAccount::where('provider', $provider)->where('provider_id', $providerId)->first(); $user = $social?->user;
@@ -60,18 +66,33 @@ class AuthController extends Controller
             $user = User::where('email', $email)->first();
             if ($user && $user->account_type !== $saved['role']) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('This email is already registered under a different account type.'));
             if (!$user) {
-                $user = DB::transaction(function () use ($saved, $email, $name) {
-                    $accountType = $saved['role']; $newUser = User::create(['name' => $name ?: 'Social user', 'email' => $email, 'password' => Str::random(48), 'account_type' => $accountType, 'email_verified_at' => now()]);
+                $user = DB::transaction(function () use ($saved, $email, $name, $phone) {
+                    $accountType = $saved['role']; $newUser = User::create(['name' => $name ?: 'Social user', 'email' => $email, 'phone' => $phone ?: null, 'password' => Str::random(48), 'account_type' => $accountType, 'email_verified_at' => now()]);
                     $newUser->syncRoles([$accountType === 'vendor' ? 'Vendor' : 'Buyer']);
-                    if ($accountType === 'vendor') Vendor::create(['registration_type' => $saved['registration_type'] ?? 'freelancer', 'name' => $newUser->name, 'first_name' => $newUser->name, 'phone' => '', 'email' => $email, 'status' => 'pending_approval', 'user_id' => $newUser->id]);
+                    if ($accountType === 'vendor') Vendor::create(['registration_type' => $saved['registration_type'] ?? 'freelancer', 'name' => $newUser->name, 'first_name' => $newUser->name, 'phone' => $phone ?: '', 'email' => $email, 'status' => 'pending_approval', 'user_id' => $newUser->id]);
                     return $newUser;
                 });
             }
             SocialAccount::create(['user_id' => $user->id, 'provider' => $provider, 'provider_id' => $providerId, 'email' => $email]);
         }
+        if ($phone && ! $user->phone) {
+            $user->update(['phone' => $phone]);
+            if ($user->account_type === 'vendor' && $user->vendorProfile) $user->vendorProfile->update(['phone' => $phone]);
+        }
         if ($user->is_blocked || ($user->account_type === 'vendor' && $user->vendorProfile && $user->vendorProfile->status !== 'approved')) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('Your account is not active yet.'));
         $user->update(['last_login_at' => now()]);
-        return redirect(config('app.frontend_url').'/social-auth/callback?token='.urlencode($user->createToken('social-login')->plainTextToken).'&provider='.urlencode($provider));
+        $token = $user->createToken('social-login')->plainTextToken;
+        $next = $user->phone ? '/social-auth/callback' : '/social-auth/complete';
+        return redirect(config('app.frontend_url').$next.'?token='.urlencode($token).'&provider='.urlencode($provider));
+    }
+
+    public function completeSocialProfile(Request $request)
+    {
+        $data = $request->validate(['phone' => ['required', 'string', 'max:30']]);
+        $user = $request->user();
+        $user->update(['phone' => trim($data['phone'])]);
+        if ($user->account_type === 'vendor' && $user->vendorProfile) $user->vendorProfile->update(['phone' => trim($data['phone'])]);
+        return response()->json(['message' => 'Phone number saved successfully.', 'user' => $this->serializeUser($user->fresh())]);
     }
     public function registerVendor(Request $request)
     {

@@ -41,6 +41,7 @@ export function getCurrentUser() {
 }
 
 export function getCurrentUserWithToken(token) { return request('/api/auth/user', { headers: { Authorization: `Bearer ${token}` } }) }
+export function completeSocialProfile(token, phone) { return request('/api/auth/complete-social-profile', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) }) }
 
 export function logoutUser() {
   return request('/api/auth/logout', { method: 'POST', headers: authHeaders() })

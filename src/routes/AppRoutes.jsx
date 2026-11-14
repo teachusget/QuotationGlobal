@@ -4,6 +4,7 @@ import AppLayout from '../components/layout/AppLayout'
 import { allNavigation } from '../data/navigation'
 import HomePage from '../pages/HomePage'
 import ProtectedRoute from '../auth/ProtectedRoute'
+import SocialAuthCompletePage from '../pages/SocialAuthCompletePage'
 import MarketplacePage from '../pages/MarketplacePage'
 import PublicMarketplaceLayout from '../components/layout/PublicMarketplaceLayout'
 import { useAuth } from '../auth/useAuth'
@@ -71,6 +72,7 @@ export default function AppRoutes() {
     <Route path="/forgot-password" element={<ForgotPasswordPage/>}/>
     <Route path="/reset-password/:token" element={<ResetPasswordPage/>}/>
     <Route path="/social-auth/callback" element={<SocialAuthCallbackPage/>}/>
+    <Route path="/social-auth/complete" element={<SocialAuthCompletePage/>}/>
     <Route element={<PublicMarketplaceLayout/>}>
       <Route path="/marketplace" element={<MarketplacePage/>}/>
       <Route path="/marketplace/solutions" element={<BrowseSolutionsPage/>}/>
