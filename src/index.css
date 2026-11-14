@@ -184,6 +184,24 @@ form[aria-label="Service editor"] > div.mt-5.rounded-md.border.p-3:has(> h3:only
   .brand-marquee:hover .brand-marquee-track { animation-play-state: paused; }
 }
 
+/* Short laptop viewports must fit the complete sign-in panel without a visible scroll. */
+@media (max-height: 700px) {
+  .auth-scroll-panel { overflow: hidden !important; padding-top: .5rem !important; padding-bottom: .5rem !important; }
+  .auth-login-content { min-height: 0 !important; }
+  .auth-login-intro { margin-top: .5rem !important; }
+  .auth-login-intro h1 { margin-top: .25rem !important; font-size: 1.25rem !important; line-height: 1.5rem !important; }
+  .auth-login-intro p { margin-top: .125rem !important; font-size: .75rem !important; }
+  .auth-login-form { margin-top: .5rem !important; row-gap: .25rem !important; }
+  .auth-login-form label { font-size: .6875rem !important; }
+  .auth-login-form input { height: 2.125rem !important; font-size: .75rem !important; }
+  .auth-login-form button[type="submit"] { height: 2.125rem !important; font-size: .75rem !important; }
+  .auth-login-divider { margin-top: .5rem !important; }
+  .auth-login-social { margin-top: .375rem !important; }
+  .auth-login-social button { height: 2.125rem !important; font-size: .6875rem !important; }
+  .auth-login-links { margin-top: .375rem !important; row-gap: 0 !important; font-size: .6875rem !important; }
+  .auth-login-content > p:last-child { margin-top: 0 !important; padding-top: .125rem !important; font-size: .625rem !important; }
+}
+
 @keyframes brand-marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
