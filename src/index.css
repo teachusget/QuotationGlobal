@@ -217,6 +217,19 @@ form[aria-label="Service editor"] > div.mt-5.rounded-md.border.p-3:has(> h3:only
 .auth-login-links { margin-top: clamp(.375rem, 1.8vh, 1.25rem) !important; row-gap: clamp(0px, .7vh, .5rem) !important; font-size: clamp(.6875rem, 1.55vh, .75rem) !important; }
 .auth-login-content > p:last-child { margin-top: 0 !important; padding-top: clamp(.125rem, .8vh, .5rem) !important; font-size: clamp(.625rem, 1.35vh, .6875rem) !important; }
 
+/* Tiny browser windows need proportional fitting to keep every action reachable. */
+@media (max-height: 430px) {
+  .auth-scroll-panel { overflow: hidden !important; padding: .25rem !important; }
+  .auth-login-content {
+    --auth-fit-scale: clamp(.62, calc(100vh / 650), .78);
+    width: calc(100% / var(--auth-fit-scale)) !important;
+    max-width: calc(390px / var(--auth-fit-scale)) !important;
+    min-height: max-content !important;
+    transform: scale(var(--auth-fit-scale));
+    transform-origin: top center;
+  }
+}
+
 @keyframes brand-marquee {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
