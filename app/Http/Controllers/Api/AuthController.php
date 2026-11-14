@@ -33,7 +33,7 @@ class AuthController extends Controller
         $request->session()->put('social_auth_state', ['value' => $state, 'provider' => $provider, 'role' => $role, 'registration_type' => $registrationType]);
         $redirectUri = $request->getSchemeAndHttpHost().'/auth/'.$provider.'/callback';
         $params = $provider === 'google'
-            ? ['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid email profile https://www.googleapis.com/auth/user.phonenumbers.read', 'state' => $state, 'access_type' => 'online', 'prompt' => 'select_account']
+            ? ['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid email profile', 'state' => $state, 'access_type' => 'online', 'prompt' => 'select_account']
             : ['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid profile email', 'state' => $state];
         $endpoint = $provider === 'google' ? 'https://accounts.google.com/o/oauth2/v2/auth' : 'https://www.linkedin.com/oauth/v2/authorization';
         return redirect()->away($endpoint.'?'.http_build_query($params));
@@ -55,10 +55,6 @@ class AuthController extends Controller
         if (!$profileResponse->successful()) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('Unable to read the social profile.'));
         $profile = $profileResponse->json(); $providerId = (string) ($profile['sub'] ?? $profile['id'] ?? ''); $email = strtolower(trim((string) ($profile['email'] ?? '')));
         $phone = trim((string) ($profile['phone_number'] ?? $profile['phone'] ?? ''));
-        if ($provider === 'google') {
-            $phoneResponse = Http::withToken($accessToken)->get('https://people.googleapis.com/v1/people/me', ['personFields' => 'phoneNumbers']);
-            $phone = trim((string) ($phoneResponse->json('phoneNumbers.0.value') ?? $phone));
-        }
         $name = trim((string) ($profile['name'] ?? trim(($profile['given_name'] ?? '').' '.($profile['family_name'] ?? ''))));
         if (!$providerId || !$email) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('The social provider did not return a usable email address.'));
         $social = SocialAccount::where('provider', $provider)->where('provider_id', $providerId)->first(); $user = $social?->user;

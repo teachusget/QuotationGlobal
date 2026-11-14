@@ -7,6 +7,10 @@ import { Button } from '../components/ui'
 import SocialLoginChooser from '../components/auth/SocialLoginChooser'
 import { startSocialLogin } from '../components/auth/socialLogin'
 
+function GoogleLogo() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5"><path fill="#4285F4" d="M21.35 12.23c0-.72-.06-1.42-.18-2.09H12v3.96h5.24a4.48 4.48 0 0 1-1.94 2.94v2.45h3.14c1.84-1.69 2.91-4.18 2.91-7.26Z"/><path fill="#34A853" d="M12 21.75c2.63 0 4.84-.87 6.45-2.36l-3.14-2.45c-.87.58-1.98.92-3.31.92-2.54 0-4.69-1.72-5.46-4.03H3.3v2.53A9.75 9.75 0 0 0 12 21.75Z"/><path fill="#FBBC05" d="M6.54 13.83A5.86 5.86 0 0 1 6.23 12c0-.64.11-1.26.31-1.83V7.64H3.3A9.75 9.75 0 0 0 2.25 12c0 1.57.38 3.05 1.05 4.36l3.24-2.53Z"/><path fill="#EA4335" d="M12 6.14c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.83 3.2 14.63 2.25 12 2.25a9.75 9.75 0 0 0-8.7 5.39l3.24 2.53C7.31 7.86 9.46 6.14 12 6.14Z"/></svg>
+}
+
 export default function LoginPage() {
   const { isAuthenticated, login } = useAuth()
   const navigate = useNavigate()
@@ -52,7 +56,7 @@ export default function LoginPage() {
           <Button type="submit" size="lg" loading={submitting} className="w-full">{submitting ? 'Signing in' : 'Sign in'}</Button>
         </form>
         <div className="relative mt-5"><div className="absolute inset-x-0 top-1/2 border-t border-slate-200"/><span className="relative mx-auto block w-fit bg-white px-3 text-[11px] font-medium uppercase tracking-wider text-slate-400">or continue with</span></div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => startSocialLogin('google', setSocialProvider)} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm hover:border-blue-300 hover:bg-blue-50/40"><span className="grid h-6 w-6 place-items-center rounded-md text-sm font-extrabold text-[#4285f4] ring-1 ring-slate-200">G</span>Continue with Google</button><button type="button" onClick={() => startSocialLogin('linkedin', setSocialProvider)} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm hover:border-blue-300 hover:bg-blue-50/40"><span className="grid h-6 w-6 place-items-center rounded-md bg-[#0a66c2] text-[11px] font-extrabold text-white">in</span>Continue with LinkedIn</button></div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => startSocialLogin('google', setSocialProvider)} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm hover:border-blue-300 hover:bg-blue-50/40"><span className="grid h-6 w-6 place-items-center rounded-md bg-white ring-1 ring-slate-200"><GoogleLogo/></span>Continue with Google</button><button type="button" onClick={() => startSocialLogin('linkedin', setSocialProvider)} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm hover:border-blue-300 hover:bg-blue-50/40"><span className="grid h-6 w-6 place-items-center rounded-md bg-[#0a66c2] text-[11px] font-extrabold text-white">in</span>Continue with LinkedIn</button></div>
         <div className="mt-5 space-y-2 text-center text-xs text-slate-500"><p><Link to="/forgot-password" className="font-semibold text-primary hover:text-blue-700">Forgot your password?</Link></p><p>New to the portal? <Link to="/register" className="font-semibold text-primary hover:text-blue-700">Create an account</Link></p></div>
         <p className="mt-6 text-center text-[11px] text-slate-400">© 2026 Quotation Global. All rights reserved.</p>
       </div>
