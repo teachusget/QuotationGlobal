@@ -219,14 +219,14 @@ form[aria-label="Service editor"] > div.mt-5.rounded-md.border.p-3:has(> h3:only
 
 /* Tiny browser windows need proportional fitting to keep every action reachable. */
 @media (max-height: 430px) {
-  .auth-scroll-panel { overflow: hidden !important; padding: .25rem !important; }
+  .auth-scroll-panel { overflow-y: auto !important; padding: .25rem !important; scrollbar-width: thin; scrollbar-color: #94a3b8 transparent; }
+  .auth-scroll-panel::-webkit-scrollbar { display: block; width: 7px; }
+  .auth-scroll-panel::-webkit-scrollbar-thumb { border-radius: 999px; background: #94a3b8; }
   .auth-login-content {
-    --auth-fit-scale: clamp(.48, calc(100vh / 720), .78);
-    width: calc(390px / var(--auth-fit-scale)) !important;
-    max-width: none !important;
+    width: 100% !important;
+    max-width: 390px !important;
     min-height: max-content !important;
-    transform: scale(var(--auth-fit-scale));
-    transform-origin: top center;
+    transform: none !important;
   }
 }
 
