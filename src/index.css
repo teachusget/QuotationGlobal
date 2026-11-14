@@ -144,8 +144,38 @@ form[aria-label="Service editor"] > div.mt-5.rounded-md.border.p-3:has(> h3:only
   .ui-table-shell td { @apply px-4 py-3.5; }
   .ui-table-shell tbody tr { @apply border-t; }
   .ui-skeleton { background: linear-gradient(90deg, #e8edf4 25%, #f6f8fb 50%, #e8edf4 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.5s ease-in-out infinite; }
-  .auth-scroll-panel { scrollbar-width: none; overscroll-behavior: contain; }
+  .auth-scroll-panel { overflow: hidden !important; scrollbar-width: none; overscroll-behavior: contain; }
   .auth-scroll-panel::-webkit-scrollbar { display: none; }
+  @media (max-height: 700px) {
+    .auth-scroll-panel { overflow-y: auto !important; padding-top: .5rem; padding-bottom: .5rem; }
+    .auth-login-content { min-height: max-content; }
+    .auth-login-intro { margin-top: .5rem; }
+    .auth-login-intro h1 { margin-top: .25rem; font-size: 1.25rem; line-height: 1.5rem; }
+    .auth-login-intro p { margin-top: .125rem; }
+    .auth-login-form { margin-top: .5rem; row-gap: .25rem; }
+    .auth-login-form input { height: 2.25rem; }
+    .auth-login-form button[type="submit"] { height: 2.25rem; }
+    .auth-login-divider { margin-top: .5rem; }
+    .auth-login-social { margin-top: .375rem; }
+    .auth-login-social button { height: 2.25rem; }
+    .auth-login-links { margin-top: .5rem; row-gap: .125rem; }
+    .auth-login-content > p:last-child { padding-top: .25rem; }
+  }
+  @media (min-width: 641px) and (max-height: 760px) {
+    .auth-scroll-panel { padding-top: .75rem; padding-bottom: .75rem; }
+    .auth-login-content { min-height: max-content; }
+    .auth-login-intro { margin-top: .75rem; }
+    .auth-login-intro h1 { margin-top: .25rem; font-size: 1.375rem; line-height: 1.625rem; }
+    .auth-login-intro p { margin-top: .125rem; }
+    .auth-login-form { margin-top: .625rem; row-gap: .375rem; }
+    .auth-login-form input { height: 2.25rem; }
+    .auth-login-form button[type="submit"] { height: 2.25rem; }
+    .auth-login-divider { margin-top: .625rem; }
+    .auth-login-social { margin-top: .375rem; }
+    .auth-login-social button { height: 2.25rem; }
+    .auth-login-links { margin-top: .5rem; row-gap: .125rem; }
+    .auth-login-content > p:last-child { padding-top: .25rem; }
+  }
 }
 
 @layer utilities {
