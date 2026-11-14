@@ -457,6 +457,78 @@ html.dark form[class*="max-h-[92vh]"] > div:first-child h2 { color: #f1f5f9; }
   * { box-shadow: none !important; }
 }
 
+/* Responsive marketplace guardrails. Keep the page itself from becoming a
+   horizontal scroller when a card, label, or CMS value is longer than the
+   available viewport. Individual carousels/tables can still opt into their
+   own contained scrolling. */
+html, body, #root { max-width: 100%; overflow-x: hidden; }
+.marketplace-public-shell > header { min-width: 0; }
+.marketplace-public-shell > header > a { min-width: 0; }
+.marketplace-public-shell > header img { max-width: 100%; }
+.legacy-marketplace-hero,
+.legacy-marketplace-hero > div,
+.marketplace-category-browser,
+#marketplace-products { min-width: 0; max-width: 100%; }
+.legacy-marketplace-hero h1,
+.legacy-marketplace-hero p,
+.legacy-marketplace-hero a,
+.legacy-marketplace-hero span { overflow-wrap: anywhere; }
+
+@media (max-width: 639px) {
+  .marketplace-public-shell > header { padding-inline: .5rem; }
+  .marketplace-public-shell > main { padding-inline: .75rem; }
+  .marketplace-public-shell > header > a { flex: 1 1 auto; }
+  .marketplace-public-shell > header > a > div { max-width: 9rem; }
+  .marketplace-public-shell > header > a span { max-width: 9rem; }
+  .legacy-marketplace-hero { border-radius: 1.25rem !important; }
+  .legacy-marketplace-hero h1 {
+    font-size: clamp(2rem, 9vw, 2.75rem) !important;
+    line-height: 1.08 !important;
+  }
+  .legacy-marketplace-hero h1 + p { font-size: .875rem; line-height: 1.65; }
+  .legacy-marketplace-hero h1 + p ~ div.grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .5rem;
+    width: 100%;
+  }
+  .legacy-marketplace-hero h1 + p ~ div.grid > div {
+    min-width: 0;
+    align-items: flex-start;
+    gap: .35rem;
+    font-size: .6875rem;
+    line-height: 1.25;
+  }
+  .legacy-marketplace-hero h1 + p ~ div.grid > div > span:last-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .legacy-marketplace-hero h1 + p ~ div.grid > div > span:first-child {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+  .legacy-marketplace-hero h1 + p ~ div.flex { flex-direction: column; align-items: stretch; }
+  .legacy-marketplace-hero h1 + p ~ div.flex > a { width: 100%; justify-content: center; }
+  .legacy-marketplace-hero .hero-discovery {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .legacy-marketplace-hero .hero-discovery::-webkit-scrollbar { display: none; }
+  .legacy-marketplace-hero .hero-discovery > * { flex: 0 0 auto; }
+  .hero-stats > div { min-width: 0; padding-inline: 1rem; }
+  .hero-stats > div > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .legacy-marketplace-hero h1 { font-size: clamp(2.4rem, 6vw, 3.5rem) !important; }
+  .legacy-marketplace-hero .hero-discovery { flex-wrap: wrap; }
+}
+
+@media (min-width: 1536px) {
+  .marketplace-public-shell > main { max-width: 1600px; }
+  .legacy-marketplace-hero { padding-inline: clamp(2rem, 5vw, 6rem) !important; }
+}
+
 /* Legacy free-text feature field was replaced by structured comparison fields. */
 form[class*="max-h-[92vh]"] div:has(> label > textarea[maxlength="5000"]) { display: none; }
 /* Marketplace search lives in the global header; avoid a duplicate field in the hero. */
