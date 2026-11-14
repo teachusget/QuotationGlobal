@@ -74,7 +74,7 @@ export default function PhoneCountryField({
         htmlFor="register-phone"
         className="mb-1.5 block text-xs font-semibold"
       >
-        Phone Number
+        Phone Number{required && <span className="text-red-500"> *</span>}
       </label>
       <div
         ref={root}

@@ -2,6 +2,7 @@ import { ChevronDown, Eye, EyeOff, MapPin, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import useDialogAccessibility from '../../hooks/useDialogAccessibility'
 import { countryCatalog } from '../../data/countryCatalog'
+import PhoneCountryField from '../common/PhoneCountryField'
 
 const typeLabels = {
   freelancer: 'Freelancer',
@@ -17,6 +18,7 @@ const initialForm = {
   password_confirmation: '',
   designation: '',
   phone: '',
+  phone_country: 'Pakistan',
   email: '',
   country: '',
   address: '',
@@ -210,7 +212,7 @@ export default function VendorModal({ open, registrationType, vendor, saving, se
             <div className="sm:col-span-2"><Field label="Business/Vendor Name" name="company_name" value={form.company_name} onChange={change} required/></div>
             <Field label="Owner First Name" name="first_name" value={form.first_name} onChange={change} required/>
             <Field label="Owner Last Name" name="last_name" value={form.last_name} onChange={change}/>
-            <Field label="Phone Number" name="phone" value={form.phone} onChange={change} type="tel" required/>
+            <PhoneCountryField value={form.phone} country={form.phone_country} required onChange={(phone) => { setForm((current) => ({ ...current, phone })); setError(''); onClearError() }} onCountryChange={(phone_country) => setForm((current) => ({ ...current, phone_country }))}/>
             <Field label="Email" name="email" value={form.email} onChange={change} type="email" required/>
             <PasswordField label={vendor?.user ? 'Password (optional)' : 'Password'} name="password" value={form.password} onChange={change} visible={showPassword} onToggle={() => setShowPassword((current) => !current)} required={!vendor?.user}/>
             <PasswordField label={vendor?.user ? 'Confirm Password (if changing)' : 'Confirm Password'} name="password_confirmation" value={form.password_confirmation} onChange={change} visible={showConfirmation} onToggle={() => setShowConfirmation((current) => !current)} required={!vendor?.user}/>
@@ -224,7 +226,7 @@ export default function VendorModal({ open, registrationType, vendor, saving, se
             <Field label="Owner First Name" name="first_name" value={form.first_name} onChange={change} required/>
             <Field label="Owner Last Name" name="last_name" value={form.last_name} onChange={change}/>
             <Field label="Email" name="email" value={form.email} onChange={change} type="email" required/>
-            <Field label="Phone Number" name="phone" value={form.phone} onChange={change} type="tel" required/>
+            <PhoneCountryField value={form.phone} country={form.phone_country} required onChange={(phone) => { setForm((current) => ({ ...current, phone })); setError(''); onClearError() }} onCountryChange={(phone_country) => setForm((current) => ({ ...current, phone_country }))}/>
             <PasswordField label={vendor?.user ? 'Password (optional)' : 'Password'} name="password" value={form.password} onChange={change} visible={showPassword} onToggle={() => setShowPassword((current) => !current)} required={!vendor?.user}/>
             <PasswordField label={vendor?.user ? 'Confirm Password (if changing)' : 'Confirm Password'} name="password_confirmation" value={form.password_confirmation} onChange={change} visible={showConfirmation} onToggle={() => setShowConfirmation((current) => !current)} required={!vendor?.user}/>
             <SearchableSelect label="Country Name" name="country" value={form.country} options={countries} onChange={select} required placeholder="Select country" country/>
