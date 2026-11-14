@@ -4,6 +4,8 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import BrandLogo from '../components/common/BrandLogo'
 import { useAuth } from '../auth/useAuth'
 import { Button } from '../components/ui'
+import SocialLoginChooser from '../components/auth/SocialLoginChooser'
+import { startSocialLogin } from '../components/auth/socialLogin'
 
 export default function LoginPage() {
   const { isAuthenticated, login } = useAuth()
@@ -15,6 +17,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [socialProvider, setSocialProvider] = useState('')
   const socialError = new URLSearchParams(location.search).get('social_error')
 
   useEffect(() => { document.title = 'Sign In | Quotation Global' }, [])
@@ -48,11 +51,13 @@ export default function LoginPage() {
           <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-primary"/>Remember me</label>
           <Button type="submit" size="lg" loading={submitting} className="w-full">{submitting ? 'Signing in' : 'Sign in'}</Button>
         </form>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2"><a href="/auth/google/redirect?role=buyer" className="inline-flex h-10 items-center justify-center rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">Continue with Google</a><a href="/auth/linkedin/redirect?role=buyer" className="inline-flex h-10 items-center justify-center rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">Continue with LinkedIn</a></div>
+        <div className="relative mt-5"><div className="absolute inset-x-0 top-1/2 border-t border-slate-200"/><span className="relative mx-auto block w-fit bg-white px-3 text-[11px] font-medium uppercase tracking-wider text-slate-400">or continue with</span></div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => startSocialLogin('google', setSocialProvider)} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm hover:border-blue-300 hover:bg-blue-50/40"><span className="grid h-6 w-6 place-items-center rounded-md text-sm font-extrabold text-[#4285f4] ring-1 ring-slate-200">G</span>Continue with Google</button><button type="button" onClick={() => startSocialLogin('linkedin', setSocialProvider)} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm hover:border-blue-300 hover:bg-blue-50/40"><span className="grid h-6 w-6 place-items-center rounded-md bg-[#0a66c2] text-[11px] font-extrabold text-white">in</span>Continue with LinkedIn</button></div>
         <div className="mt-5 space-y-2 text-center text-xs text-slate-500"><p><Link to="/forgot-password" className="font-semibold text-primary hover:text-blue-700">Forgot your password?</Link></p><p>New to the portal? <Link to="/register" className="font-semibold text-primary hover:text-blue-700">Create an account</Link></p></div>
         <p className="mt-6 text-center text-[11px] text-slate-400">© 2026 Quotation Global. All rights reserved.</p>
       </div>
     </section>
     <section className="relative hidden overflow-hidden bg-slate-950 lg:block" aria-hidden="true"><div className="absolute right-0 top-0 h-full w-2 bg-primary"/><div className="absolute right-16 top-24 h-56 w-56 border border-slate-700"/><div className="absolute bottom-28 right-48 h-32 w-32 border border-primary/60"/><div className="relative flex h-full flex-col justify-between p-12 xl:p-16"><BrandLogo inverse/><div className="max-w-xl"><div className="mb-6 h-px w-16 bg-primary"/><h2 className="text-4xl font-bold leading-tight text-white xl:text-5xl">Technology sourcing, managed from one place.</h2><p className="mt-5 max-w-lg text-base leading-7 text-slate-300">Connect with technology partners, manage RFQs, and compare solutions across the global marketplace.</p></div><p className="text-xs text-slate-500">Secure administrator access</p></div></section>
+    <SocialLoginChooser open={Boolean(socialProvider)} provider={socialProvider} onClose={() => setSocialProvider('')} />
   </main>
 }

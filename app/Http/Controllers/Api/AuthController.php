@@ -25,10 +25,12 @@ class AuthController extends Controller
         abort_unless(in_array($provider, ['google', 'linkedin'], true), 404);
         $role = $request->query('role', 'buyer');
         abort_unless(in_array($role, ['buyer', 'vendor'], true), 422);
+        $registrationType = $request->query('registration_type', 'freelancer');
+        abort_unless($role === 'buyer' || in_array($registrationType, ['freelancer', 'agency', 'company'], true), 422);
         $clientId = config('services.'.$provider.'.client_id');
         abort_unless($clientId, 503, 'This social login provider is not configured.');
         $state = Str::random(64);
-        $request->session()->put('social_auth_state', ['value' => $state, 'provider' => $provider, 'role' => $role]);
+        $request->session()->put('social_auth_state', ['value' => $state, 'provider' => $provider, 'role' => $role, 'registration_type' => $registrationType]);
         $redirectUri = $request->getSchemeAndHttpHost().'/auth/'.$provider.'/callback';
         $params = $provider === 'google'
             ? ['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid email profile', 'state' => $state, 'access_type' => 'online', 'prompt' => 'select_account']
@@ -41,7 +43,7 @@ class AuthController extends Controller
     {
         abort_unless(in_array($provider, ['google', 'linkedin'], true), 404);
         $saved = $request->session()->pull('social_auth_state');
-        if (!$saved || !hash_equals($saved['value'] ?? '', (string) $request->query('state'))) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('The social login session expired. Please try again.'));
+        if (!$saved || ($saved['provider'] ?? null) !== $provider || !hash_equals($saved['value'] ?? '', (string) $request->query('state'))) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('The social login session expired. Please try again.'));
         if ($request->query('error') || !$request->query('code')) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('Social login was cancelled.'));
         $clientId = config('services.'.$provider.'.client_id'); $clientSecret = config('services.'.$provider.'.client_secret');
         $redirectUri = $request->getSchemeAndHttpHost().'/auth/'.$provider.'/callback';
@@ -61,7 +63,7 @@ class AuthController extends Controller
                 $user = DB::transaction(function () use ($saved, $email, $name) {
                     $accountType = $saved['role']; $newUser = User::create(['name' => $name ?: 'Social user', 'email' => $email, 'password' => Str::random(48), 'account_type' => $accountType, 'email_verified_at' => now()]);
                     $newUser->syncRoles([$accountType === 'vendor' ? 'Vendor' : 'Buyer']);
-                    if ($accountType === 'vendor') Vendor::create(['registration_type' => 'freelancer', 'name' => $newUser->name, 'first_name' => $newUser->name, 'phone' => '', 'email' => $email, 'status' => 'pending_approval', 'user_id' => $newUser->id]);
+                    if ($accountType === 'vendor') Vendor::create(['registration_type' => $saved['registration_type'] ?? 'freelancer', 'name' => $newUser->name, 'first_name' => $newUser->name, 'phone' => '', 'email' => $email, 'status' => 'pending_approval', 'user_id' => $newUser->id]);
                     return $newUser;
                 });
             }
@@ -69,7 +71,7 @@ class AuthController extends Controller
         }
         if ($user->is_blocked || ($user->account_type === 'vendor' && $user->vendorProfile && $user->vendorProfile->status !== 'approved')) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('Your account is not active yet.'));
         $user->update(['last_login_at' => now()]);
-        return redirect(config('app.frontend_url').'/social-auth/callback?token='.urlencode($user->createToken('social-login')->plainTextToken));
+        return redirect(config('app.frontend_url').'/social-auth/callback?token='.urlencode($user->createToken('social-login')->plainTextToken).'&provider='.urlencode($provider));
     }
     public function registerVendor(Request $request)
     {
@@ -417,6 +419,7 @@ class AuthController extends Controller
         $user->load(['roles:id,name', 'vendorProfile']);
         if ($user->account_type === 'vendor' && $user->vendorProfile) {
             $user->setAttribute('vendor_id', $user->vendorProfile->id);
+            $user->setAttribute('registration_type', $user->vendorProfile->registration_type);
             foreach (['company_name', 'address', 'city', 'country'] as $field) {
                 if (! $user->{$field}) $user->setAttribute($field, $user->vendorProfile->{$field});
             }
