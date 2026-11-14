@@ -39,9 +39,12 @@ export function AuthProvider({ children }) {
   }, [])
 
   const logout = useCallback(async () => {
-    try { await logoutUser() } catch { /* Clear the local session even if the request fails. */ }
+    // Update the UI immediately; a slow logout request must not leave stale
+    // account controls visible until the browser is refreshed.
+    const request = logoutUser().catch(() => null)
     clearAuth()
     setUser(null)
+    await request
   }, [])
 
   const refreshUser = useCallback(async () => {
