@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Models\SocialAccount;
 use App\Support\Audit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -15,9 +16,61 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 class AuthController extends Controller
 {
+    public function socialRedirect(Request $request, string $provider)
+    {
+        abort_unless(in_array($provider, ['google', 'linkedin'], true), 404);
+        $role = $request->query('role', 'buyer');
+        abort_unless(in_array($role, ['buyer', 'vendor'], true), 422);
+        $clientId = config('services.'.$provider.'.client_id');
+        abort_unless($clientId, 503, 'This social login provider is not configured.');
+        $state = Str::random(64);
+        $request->session()->put('social_auth_state', ['value' => $state, 'provider' => $provider, 'role' => $role]);
+        $redirectUri = $request->getSchemeAndHttpHost().'/auth/'.$provider.'/callback';
+        $params = $provider === 'google'
+            ? ['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid email profile', 'state' => $state, 'access_type' => 'online', 'prompt' => 'select_account']
+            : ['client_id' => $clientId, 'redirect_uri' => $redirectUri, 'response_type' => 'code', 'scope' => 'openid profile email', 'state' => $state];
+        $endpoint = $provider === 'google' ? 'https://accounts.google.com/o/oauth2/v2/auth' : 'https://www.linkedin.com/oauth/v2/authorization';
+        return redirect()->away($endpoint.'?'.http_build_query($params));
+    }
+
+    public function socialCallback(Request $request, string $provider)
+    {
+        abort_unless(in_array($provider, ['google', 'linkedin'], true), 404);
+        $saved = $request->session()->pull('social_auth_state');
+        if (!$saved || !hash_equals($saved['value'] ?? '', (string) $request->query('state'))) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('The social login session expired. Please try again.'));
+        if ($request->query('error') || !$request->query('code')) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('Social login was cancelled.'));
+        $clientId = config('services.'.$provider.'.client_id'); $clientSecret = config('services.'.$provider.'.client_secret');
+        $redirectUri = $request->getSchemeAndHttpHost().'/auth/'.$provider.'/callback';
+        $tokenUrl = $provider === 'google' ? 'https://oauth2.googleapis.com/token' : 'https://www.linkedin.com/oauth/v2/accessToken';
+        $tokenResponse = Http::asForm()->post($tokenUrl, ['grant_type' => 'authorization_code', 'code' => $request->query('code'), 'client_id' => $clientId, 'client_secret' => $clientSecret, 'redirect_uri' => $redirectUri]);
+        if (!$tokenResponse->successful()) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('Unable to complete social login.'));
+        $profileResponse = Http::withToken($tokenResponse->json('access_token'))->get($provider === 'google' ? 'https://openidconnect.googleapis.com/v1/userinfo' : 'https://api.linkedin.com/v2/userinfo');
+        if (!$profileResponse->successful()) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('Unable to read the social profile.'));
+        $profile = $profileResponse->json(); $providerId = (string) ($profile['sub'] ?? $profile['id'] ?? ''); $email = strtolower(trim((string) ($profile['email'] ?? '')));
+        $name = trim((string) ($profile['name'] ?? trim(($profile['given_name'] ?? '').' '.($profile['family_name'] ?? ''))));
+        if (!$providerId || !$email) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('The social provider did not return a usable email address.'));
+        $social = SocialAccount::where('provider', $provider)->where('provider_id', $providerId)->first(); $user = $social?->user;
+        if (!$user) {
+            $user = User::where('email', $email)->first();
+            if ($user && $user->account_type !== $saved['role']) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('This email is already registered under a different account type.'));
+            if (!$user) {
+                $user = DB::transaction(function () use ($saved, $email, $name) {
+                    $accountType = $saved['role']; $newUser = User::create(['name' => $name ?: 'Social user', 'email' => $email, 'password' => Str::random(48), 'account_type' => $accountType, 'email_verified_at' => now()]);
+                    $newUser->syncRoles([$accountType === 'vendor' ? 'Vendor' : 'Buyer']);
+                    if ($accountType === 'vendor') Vendor::create(['registration_type' => 'freelancer', 'name' => $newUser->name, 'first_name' => $newUser->name, 'phone' => '', 'email' => $email, 'status' => 'pending_approval', 'user_id' => $newUser->id]);
+                    return $newUser;
+                });
+            }
+            SocialAccount::create(['user_id' => $user->id, 'provider' => $provider, 'provider_id' => $providerId, 'email' => $email]);
+        }
+        if ($user->is_blocked || ($user->account_type === 'vendor' && $user->vendorProfile && $user->vendorProfile->status !== 'approved')) return redirect(config('app.frontend_url').'/login?social_error='.urlencode('Your account is not active yet.'));
+        $user->update(['last_login_at' => now()]);
+        return redirect(config('app.frontend_url').'/social-auth/callback?token='.urlencode($user->createToken('social-login')->plainTextToken));
+    }
     public function registerVendor(Request $request)
     {
         $data = $request->validate([

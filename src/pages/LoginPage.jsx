@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const socialError = new URLSearchParams(location.search).get('social_error')
 
   useEffect(() => { document.title = 'Sign In | Quotation Global' }, [])
   if (isAuthenticated) return <Navigate to="/" replace />
@@ -41,12 +42,13 @@ export default function LoginPage() {
         <BrandLogo />
         <div className="mt-8 sm:mt-10"><span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-primary"><LockKeyhole className="h-3.5 w-3.5"/>Secure portal</span><h1 className="mt-4 text-2xl font-bold text-slate-900">Welcome back</h1><p className="mt-2 text-sm text-slate-500">Sign in to manage Quotation Global.</p></div>
         <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
-          {error && <div role="alert" className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700"><AlertCircle className="mt-px h-4 w-4 shrink-0"/><span>{error}</span></div>}
+          {(error || socialError) && <div role="alert" className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700"><AlertCircle className="mt-px h-4 w-4 shrink-0"/><span>{error || socialError}</span></div>}
           <div><label htmlFor="login" className="mb-1.5 block text-xs font-semibold text-slate-700">Email address</label><div className="relative"><Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input id="login" type="email" autoComplete="username" value={loginName} onChange={(event) => setLoginName(event.target.value)} className="h-11 w-full rounded-md border bg-white pl-10 pr-3 text-sm placeholder:text-slate-400" placeholder="name@example.com" autoFocus /></div></div>
           <div><label htmlFor="password" className="mb-1.5 block text-xs font-semibold text-slate-700">Password</label><div className="relative"><LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="h-11 w-full rounded-md border bg-white pl-10 pr-11 text-sm placeholder:text-slate-400" placeholder="Enter your password"/><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-700" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff className="h-4 w-4"/> : <Eye className="h-4 w-4"/>}</button></div></div>
           <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-slate-600"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className="h-4 w-4 rounded border-slate-300 accent-primary"/>Remember me</label>
           <Button type="submit" size="lg" loading={submitting} className="w-full">{submitting ? 'Signing in' : 'Sign in'}</Button>
         </form>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2"><a href="/auth/google/redirect?role=buyer" className="inline-flex h-10 items-center justify-center rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">Continue with Google</a><a href="/auth/linkedin/redirect?role=buyer" className="inline-flex h-10 items-center justify-center rounded-md border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">Continue with LinkedIn</a></div>
         <div className="mt-5 space-y-2 text-center text-xs text-slate-500"><p><Link to="/forgot-password" className="font-semibold text-primary hover:text-blue-700">Forgot your password?</Link></p><p>New to the portal? <Link to="/register" className="font-semibold text-primary hover:text-blue-700">Create an account</Link></p></div>
         <p className="mt-6 text-center text-[11px] text-slate-400">© 2026 Quotation Global. All rights reserved.</p>
       </div>

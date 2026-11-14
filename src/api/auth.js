@@ -40,6 +40,8 @@ export function getCurrentUser() {
   return request('/api/auth/user', { headers: authHeaders() })
 }
 
+export function getCurrentUserWithToken(token) { return request('/api/auth/user', { headers: { Authorization: `Bearer ${token}` } }) }
+
 export function logoutUser() {
   return request('/api/auth/logout', { method: 'POST', headers: authHeaders() })
 }

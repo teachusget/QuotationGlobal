@@ -52,6 +52,7 @@ const SellingCountriesPage = lazy(() => import('../pages/SellingCountriesPage'))
 const AdvicePage = lazy(() => import('../pages/AdvicePage'))
 const ContactPage = lazy(() => import('../pages/ContactPage'))
 const BlogPage = lazy(() => import('../pages/BlogPage'))
+const SocialAuthCallbackPage = lazy(() => import('../pages/SocialAuthCallbackPage'))
 
 export default function AppRoutes() {
   const { user } = useAuth()
@@ -69,6 +70,7 @@ export default function AppRoutes() {
     <Route path="/solution-provider/register" element={<SolutionProviderRegisterPage/>}/>
     <Route path="/forgot-password" element={<ForgotPasswordPage/>}/>
     <Route path="/reset-password/:token" element={<ResetPasswordPage/>}/>
+    <Route path="/social-auth/callback" element={<SocialAuthCallbackPage/>}/>
     <Route element={<PublicMarketplaceLayout/>}>
       <Route path="/marketplace" element={<MarketplacePage/>}/>
       <Route path="/marketplace/solutions" element={<BrowseSolutionsPage/>}/>

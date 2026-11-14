@@ -35,6 +35,7 @@ class User extends Authenticatable
     public function assignedVendors() { return $this->belongsToMany(Vendor::class, 'user_vendor_assignments')->withTimestamps(); }
     public function assignedBrands() { return $this->belongsToMany(Brand::class, 'user_brand_assignments')->withTimestamps(); }
     public function assignedSubcategories() { return $this->belongsToMany(Category::class, 'user_subcategory_assignments', 'user_id', 'subcategory_id')->withTimestamps(); }
+    public function socialAccounts() { return $this->hasMany(SocialAccount::class); }
 
     public function isSuperAdmin(): bool { return $this->hasRole('Super Admin'); }
 }
