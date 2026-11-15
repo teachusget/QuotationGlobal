@@ -202,11 +202,12 @@ export default function MarketplaceChatWidget() {
         setFile(new File([new Blob(recordingChunks.current, { type: mimeType })], `voice-message-${Date.now()}.${extension}`, { type: mimeType }))
         stream.getTracks().forEach((track) => track.stop())
         setRecording(false)
+        setError('')
       }
       recorder.current = mediaRecorder
       mediaRecorder.start()
       setRecording(true)
-      setError('Recording… click the microphone again to stop.')
+      setError('')
     } catch (requestError) {
       if (requestError.name === 'NotAllowedError' || requestError.name === 'PermissionDeniedError') {
         setError('Microphone is blocked. Click Try again and choose Allow in the browser permission prompt.')
@@ -223,7 +224,7 @@ export default function MarketplaceChatWidget() {
   }
 
   const visibleEmojis = (emojiSearch.trim() ? Object.values(EMOJI_GROUPS).flat() : emojiGroup === 'Recent' ? recentEmojis : EMOJI_GROUPS[emojiGroup]).filter(Boolean)
-  const microphoneBlocked = error.toLowerCase().includes('microphone')
+  const microphoneBlocked = !recording && error.toLowerCase().includes('microphone')
 
   if (!user) return <button type="button" onClick={() => { window.location.href = '/login' }} className="fixed bottom-5 right-5 z-[70] grid h-12 w-12 place-items-center rounded-full bg-primary text-white shadow-lg" aria-label="Open marketplace chat"><MessageCircle className="h-5 w-5" /></button>
 
