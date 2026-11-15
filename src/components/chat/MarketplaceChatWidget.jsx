@@ -47,6 +47,7 @@ export default function MarketplaceChatWidget() {
   const previousUnread = useRef(0)
   const lastMessageId = useRef(0)
   const soundReady = useRef(false)
+  const pollInFlight = useRef(false)
   const loadedAttachments = useRef(new Set())
 
   const unread = useMemo(() => conversations.reduce((sum, row) => sum + Number(row.unread_count || 0), 0), [conversations])
@@ -85,8 +86,18 @@ export default function MarketplaceChatWidget() {
 
   useEffect(() => {
     if (!user) return undefined
-    const timer = setInterval(() => { loadConversations(true); if (open && active) loadMessages(active, true) }, 2000)
-    return () => clearInterval(timer)
+    const poll = async () => {
+      if (document.hidden || pollInFlight.current) return
+      pollInFlight.current = true
+      try {
+        await loadConversations(true)
+        if (open && active) await loadMessages(active, true)
+      } finally { pollInFlight.current = false }
+    }
+    const handleVisibility = () => { if (!document.hidden) poll() }
+    const timer = setInterval(poll, 2000)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', handleVisibility) }
     // The polling callbacks intentionally use the current chat state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, open, active?.id, sound])
