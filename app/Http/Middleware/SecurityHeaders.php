@@ -16,7 +16,7 @@ class SecurityHeaders
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $response->headers->set('Permissions-Policy', 'camera=(), geolocation=(), microphone=(), payment=(), usb=()');
+        $response->headers->set('Permissions-Policy', 'camera=(), geolocation=(), microphone=(self), payment=(), usb=()');
         $response->headers->set('X-Permitted-Cross-Domain-Policies', 'none');
         $dev = app()->isLocal() ? " 'unsafe-inline' http://localhost:5173 http://127.0.0.1:5173" : '';
         $devConnections = app()->isLocal() ? ' http://localhost:5173 http://127.0.0.1:5173 ws://localhost:5173 ws://127.0.0.1:5173' : '';
