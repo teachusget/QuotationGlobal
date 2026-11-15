@@ -85,6 +85,10 @@ export default function MarketplaceChatWidget() {
     return () => clearInterval(timer)
   }, [user?.id, open, active?.id, sound])
 
+  useEffect(() => {
+    document.querySelectorAll('input[type="file"]').forEach((input) => { input.accept = '*/*' })
+  }, [active])
+
   const openConversation = async (conversation) => {
     soundReady.current = true; setActive(conversation); setMessages([]); setError(''); setLoading(true); lastMessageId.current = 0
     try { await loadMessages(conversation) } finally { setLoading(false) }
@@ -111,8 +115,8 @@ export default function MarketplaceChatWidget() {
   const chooseFile = (event) => {
     const next = event.target.files?.[0]
     if (!next) return
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(next.type)) { setError('Only images, PDF or Word files are allowed.'); return }
-    if (next.size > 5 * 1024 * 1024) { setError('Attachment must be smaller than 5 MB.'); return }
+    if (/\.(exe|msi|apk|bat|cmd|sh|js|php|dll)$/i.test(next.name)) { setError('Executable files are not allowed.'); return }
+    if (next.size > 10 * 1024 * 1024) { setError('Attachment must be smaller than 10 MB.'); return }
     setError(''); setFile(next); event.target.value = ''
   }
 

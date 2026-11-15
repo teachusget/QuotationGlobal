@@ -65,7 +65,7 @@ class MarketplaceChatController extends Controller
     public function sendMessage(Request $request, MarketplaceConversation $conversation)
     {
         $this->authorizeConversation($request, $conversation);
-        $data = $request->validate(['message' => ['nullable', 'string', 'max:2000'], 'attachment' => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,webp,gif,pdf,doc,docx']]);
+        $data = $request->validate(['message' => ['nullable', 'string', 'max:2000'], 'attachment' => ['nullable', 'file', 'max:10240', 'mimes:jpg,jpeg,png,webp,gif,pdf,doc,docx,xls,xlsx,ppt,pptx,txt,csv,zip,rar,mp3,wav,mp4,mov,webm']]);
         abort_unless(trim($data['message'] ?? '') !== '' || $request->hasFile('attachment'), 422, 'Write a message or attach a file.');
         $message = $this->createMessage($conversation, $request->user(), trim($data['message'] ?? ''), false, $request->file('attachment'));
         $autoReply = $request->hasFile('attachment') ? null : $this->autoReply($conversation, $data['message'] ?? '');
