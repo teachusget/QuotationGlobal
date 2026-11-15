@@ -1,4 +1,4 @@
-import { Bell, Download, FileText, ImagePlus, MessageCircle, Mic, Phone, PhoneCall, Search, Send, Smile, Video, Volume2, X } from 'lucide-react'
+import { Bell, Download, FileText, ImagePlus, MessageCircle, Mic, Phone, PhoneCall, Send, Smile, Video, Volume2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
 import { authHeaders, clearAuth } from '../../auth/session'
@@ -12,6 +12,11 @@ const EMOJI_GROUPS = {
   Nature: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐙 🦄 🐝 🦋 🐢 🐍 🦎 🐳 🐬 🐟 🐠 🦈 🐘 🦒 🦓 🌸 🌹 🌻 🌞 🌈 ⭐ ⚡ 🔥 ❄️ 🌙 ☀️'.split(' '),
   Food: '🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🍍 🥝 🍅 🥑 🍔 🍟 🍕 🌭 🌮 🌯 🥗 🍿 🍩 🍪 🎂 🍰 🍫 🍬 🍭 ☕ 🍵 🥤 🍺 🍻 🍷'.split(' '),
   Symbols: '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ✅ ❌ ❗ ❓ ⁉️ 💯 🔥 ✨ ⭐ 🌟 💫 🎉 🎊 ✔️ ➕ ➖'.split(' '),
+  Animals: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🐤 🐣 🐥 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐜 🕷️ 🦂 🐢 🐍 🦎 🦖 🦕 🐙 🦑 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🐊 🐅 🐆 🦓 🦍 🐘 🦏 🦛 🐪 🐫 🦒 🦘 🐃 🐂 🐄 🐎 🐖 🐏 🐑 🦙 🐐 🦌 🐕 🐩 🐈 🐓 🦃 🕊️ 🐇 🐁 🐀 🐿️ 🦔'.split(' '),
+  Travel: '🚗 🚕 🚙 🚌 🚎 🏎️ 🚓 🚑 🚒 🚐 🛻 🚚 🚛 🚜 🛵 🏍️ 🚲 🛴 🚨 🚔 🚍 🚘 🚖 ✈️ 🛫 🛬 🛩️ 🚀 🛸 🚁 🛶 ⛵ 🚤 🛳️ 🚢 ⚓ 🗺️ 🗿 🗽 🗼 🏰 🏯 🏟️ 🎡 🎢 🎠 ⛱️ 🏖️ 🏝️ 🏜️ 🏕️ ⛰️ 🏔️ 🗻 🌋 🏠 🏡 🏢 🏥 🏦 🏨 🏪 🏫 ⛪ 🕌 🛕 🕍'.split(' '),
+  Activities: '⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🥏 🎱 🪀 🏓 🏸 🏒 🏑 🥍 🏏 ⛳ 🪁 🏹 🎣 🤿 🥊 🥋 🎽 🛹 🛼 🛷 ⛸️ 🥌 🎿 ⛷️ 🏂 🪂 🏋️ 🤼 🤸 ⛹️ 🤺 🤾 🏌️ 🏇 🧘 🏄 🏊 🤽 🚣 🧗 🚵 🧩 🎮 🕹️ 🎲 ♟️ 🎯 🎳 🎭 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🎷 🎺 🎸 🎻'.split(' '),
+  Objects: '⌚ 📱 💻 ⌨️ 🖥️ 🖨️ 🖱️ 💾 💿 📷 📸 📹 🎥 📞 ☎️ 📺 📻 🎙️ ⏰ ⏱️ ⌛ 🔋 🔌 💡 🔦 🕯️ 🧯 🛒 💰 💳 💎 ⚖️ 🔧 🔨 ⚒️ 🛠️ ⛏️ 🪚 🔩 ⚙️ 🧲 🔫 💣 🧨 🔪 🗡️ 🛡️ 🚬 ⚰️ ⚱️ 🔮 📿 💈 ⚗️ 🔭 🔬 🧪 💊 💉 🩹 🧸 🪆 🎁 🎈 🎀 🪄 🧵 🧶 📚 📖 ✏️ 📝 📌 📍 📎 📐 ✂️ 🔒 🔑 🔑'.split(' '),
+  Flags: '🏁 🚩 🎌 🏴 🏳️ 🏳️‍🌈 🏴‍☠️ 🇺🇸 🇬🇧 🇨🇦 🇦🇺 🇵🇰 🇮🇳 🇦🇪 🇸🇦 🇹🇷 🇩🇪 🇫🇷 🇮🇹 🇪🇸 🇯🇵 🇨🇳 🇰🇷 🇧🇷 🇿🇦 🇳🇬 🇪🇬 🇲🇾 🇸🇬 🇮🇩 🇧🇩 🇳🇵 🇱🇰 🇶🇦 🏳️‍⚧️'.split(' '),
 }
 
 const playSound = (type) => {
@@ -53,6 +58,7 @@ export default function MarketplaceChatWidget() {
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [emojiGroup, setEmojiGroup] = useState('Smileys')
   const [emojiSearch, setEmojiSearch] = useState('')
+  const [recentEmojis, setRecentEmojis] = useState(() => JSON.parse(localStorage.getItem('marketplace_recent_emojis') || '[]'))
   const [recording, setRecording] = useState(false)
   const [sound, setSound] = useState(() => localStorage.getItem(SOUND_KEY) || 'chime')
   const previousUnread = useRef(0)
@@ -177,6 +183,7 @@ export default function MarketplaceChatWidget() {
 
   const insertEmoji = (emoji) => {
     setText((current) => `${current}${emoji}`)
+    setRecentEmojis((current) => { const next = [emoji, ...current.filter((item) => item !== emoji)].slice(0, 24); localStorage.setItem('marketplace_recent_emojis', JSON.stringify(next)); return next })
     setEmojiOpen(false)
     setEmojiSearch('')
   }
@@ -209,11 +216,11 @@ export default function MarketplaceChatWidget() {
     }
   }
 
-  const visibleEmojis = (emojiSearch.trim() ? Object.values(EMOJI_GROUPS).flat() : EMOJI_GROUPS[emojiGroup]).filter(Boolean)
+  const visibleEmojis = (emojiSearch.trim() ? Object.values(EMOJI_GROUPS).flat() : emojiGroup === 'Recent' ? recentEmojis : EMOJI_GROUPS[emojiGroup]).filter(Boolean)
 
   if (!user) return <button type="button" onClick={() => { window.location.href = '/login' }} className="fixed bottom-5 right-5 z-[70] grid h-12 w-12 place-items-center rounded-full bg-primary text-white shadow-lg" aria-label="Open marketplace chat"><MessageCircle className="h-5 w-5" /></button>
 
-  return <>{emojiOpen && <div className="fixed bottom-36 right-4 z-[80] w-[min(350px,calc(100vw-32px))] overflow-hidden rounded-xl border bg-white shadow-2xl"><div className="flex items-center gap-2 border-b p-2"><Search className="h-4 w-4 shrink-0 text-slate-400" /><input autoFocus value={emojiSearch} onChange={(event) => setEmojiSearch(event.target.value)} placeholder="Search emoji" className="min-w-0 flex-1 text-xs outline-none" /></div>{!emojiSearch && <div className="flex gap-1 overflow-x-auto border-b px-2 py-1">{Object.keys(EMOJI_GROUPS).map((group) => <button key={group} type="button" onClick={() => setEmojiGroup(group)} className={`shrink-0 rounded px-2 py-1 text-[10px] font-semibold ${emojiGroup === group ? 'bg-blue-50 text-primary' : 'text-slate-500'}`}>{group}</button>)}</div>}<div className="grid max-h-44 grid-cols-8 gap-1 overflow-y-auto p-2">{visibleEmojis.map((emoji, index) => <button key={`${emoji}-${index}`} type="button" onClick={() => insertEmoji(emoji)} className="rounded p-1 text-xl leading-none hover:bg-blue-50" title="Add emoji">{emoji}</button>)}</div></div>}<button type="button" onClick={() => setEmojiOpen((value) => !value)} className={`fixed bottom-5 right-20 z-[80] grid h-12 w-12 place-items-center rounded-full border bg-white shadow-lg hover:bg-blue-50 ${emojiOpen ? 'text-primary' : 'text-slate-600'}`} title="Choose emoji" aria-label="Choose emoji"><Smile className="h-5 w-5" /></button>
+  return <>{emojiOpen && <div className="fixed bottom-24 right-4 z-[80] w-[min(560px,calc(100vw-24px))] overflow-hidden rounded-2xl border bg-white shadow-2xl"><div className="flex items-center gap-2 border-b px-4 py-3"><span className="text-xl">😀</span><input autoFocus value={emojiSearch} onChange={(event) => setEmojiSearch(event.target.value)} placeholder="Search emoji" className="min-w-0 flex-1 rounded-full bg-slate-100 px-4 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/30" /><button type="button" onClick={() => { setEmojiOpen(false); setEmojiSearch('') }} className="text-lg text-slate-400" aria-label="Close emoji picker">×</button></div><div className="flex items-center gap-1 overflow-x-auto border-b px-2 py-1.5">{['Recent', ...Object.keys(EMOJI_GROUPS)].map((group) => <button key={group} type="button" onClick={() => { setEmojiGroup(group); setEmojiSearch('') }} className={emojiGroup === group ? 'flex h-9 min-w-10 shrink-0 items-center justify-center rounded-lg border-b-2 border-emerald-500 text-base text-slate-900' : 'flex h-9 min-w-10 shrink-0 items-center justify-center rounded-lg text-base text-slate-500 hover:bg-slate-100'} title={group}>{group === 'Recent' ? '◷' : group === 'Smileys' ? '☺️' : group === 'People' ? '🖐️' : group === 'Nature' ? '🐻' : group === 'Food' ? '🍔' : group === 'Animals' ? '🐶' : group === 'Travel' ? '🚗' : group === 'Activities' ? '⚽' : group === 'Objects' ? '💡' : group === 'Symbols' ? '💖' : '🏁'}</button>)}</div><div className="min-h-[250px] max-h-[320px] overflow-y-auto p-3">{!visibleEmojis.length ? <p className="py-12 text-center text-xs text-slate-400">No emoji found</p> : <div className="grid grid-cols-8 gap-1 sm:grid-cols-10">{visibleEmojis.map((emoji, index) => <button key={emoji + index} type="button" onClick={() => insertEmoji(emoji)} className="rounded-lg p-1.5 text-2xl leading-none hover:bg-slate-100" title="Add emoji">{emoji}</button>)}</div>}</div><div className="flex items-center justify-center gap-0 border-t bg-slate-50 py-2"><button type="button" className="border-b-2 border-slate-800 px-8 py-1 text-base" title="Emoji">☺️</button><button type="button" onClick={() => setError('GIF picker coming soon.')} className="px-8 py-1 text-xs font-bold text-slate-500 hover:text-slate-800" title="GIF">GIF</button><button type="button" onClick={() => setError('Sticker picker coming soon.')} className="px-8 py-1 text-base text-slate-500 hover:text-slate-800" title="Stickers">◫</button></div></div>}<button type="button" onClick={() => setEmojiOpen((value) => !value)} className={`fixed bottom-5 right-20 z-[80] grid h-12 w-12 place-items-center rounded-full border bg-white shadow-lg hover:bg-blue-50 ${emojiOpen ? 'text-primary' : 'text-slate-600'}`} title="Choose emoji" aria-label="Choose emoji"><Smile className="h-5 w-5" /></button>
     {previewImage && <div className="fixed inset-0 z-[90] grid place-items-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label="Image preview" onClick={() => setPreviewImage(null)}><div className="relative flex max-h-full max-w-5xl flex-col items-center gap-3" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => setPreviewImage(null)} className="absolute -right-2 -top-2 z-10 grid h-9 w-9 place-items-center rounded-full bg-white text-slate-700 shadow" aria-label="Close image preview"><X className="h-5 w-5" /></button><img src={previewImage.url} alt={previewImage.name} className="max-h-[80vh] max-w-full rounded-xl object-contain shadow-2xl" /><a href={previewImage.url} download={previewImage.name} className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-bold text-primary shadow hover:bg-blue-50"><Download className="h-4 w-4" />Download image</a></div></div>}
     {open && <section className="fixed bottom-20 right-4 z-[70] flex h-[min(620px,calc(100vh-110px))] w-[min(390px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl">
       <header className="flex items-center justify-between bg-gradient-to-r from-[#082d66] to-primary px-4 py-3 text-white">
