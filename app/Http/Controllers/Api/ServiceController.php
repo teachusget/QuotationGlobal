@@ -89,7 +89,7 @@ class ServiceController extends Controller
         $cacheScope = $canPreview && ! $isApproved ? 'preview' : 'public';
         $data = Cache::remember("marketplace:service:{$cacheScope}:{$version}:{$service->id}", 300, function () use ($service) {
         $plans = Service::with([
-            'vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name',
+            'vendor:id,user_id,company_name,name', 'category:id,name', 'subcategory:id,name',
             'brand:id,name', 'brands:id,name', 'industries:id,name',
             'images:id,service_id,sort_order',
         ])
@@ -98,7 +98,7 @@ class ServiceController extends Controller
             ->where('service_type', $service->service_type)
             ->orderByRaw("FIELD(billing_cycle, 'hourly', 'daily', 'monthly', 'quarterly', 'semi_annual', 'annual')")
             ->get();
-        $service->load(['vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'brand:id,name', 'brands:id,name', 'industries:id,name', 'images:id,service_id,sort_order', 'specificationValues.definition']);
+        $service->load(['vendor:id,user_id,company_name,name', 'category:id,name', 'subcategory:id,name', 'brand:id,name', 'brands:id,name', 'industries:id,name', 'images:id,service_id,sort_order', 'specificationValues.definition']);
 
         return [
             'service' => $this->marketplaceResource($service, true),

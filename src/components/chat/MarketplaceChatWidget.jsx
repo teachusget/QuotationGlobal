@@ -1,0 +1,53 @@
+import { MessageCircle, Send, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../../auth/useAuth'
+import { createChatConversation, getChatConversations, getChatMessages, sendChatMessage } from '../../api/marketplaceChat'
+
+function otherPerson(conversation, userId) {
+  return Number(conversation.buyer_id) === Number(userId) ? conversation.vendor : conversation.buyer
+}
+
+export default function MarketplaceChatWidget() {
+  const { user } = useAuth()
+  const [open, setOpen] = useState(false)
+  const [conversations, setConversations] = useState([])
+  const [active, setActive] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [text, setText] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+
+  const unread = useMemo(() => conversations.reduce((total, item) => total + Number(item.unread_count || 0), 0), [conversations])
+  const loadConversations = async () => { if (!user) return; try { const result = await getChatConversations(); setConversations(result.data || []) } catch (requestError) { setError(requestError.message) } }
+  const loadMessages = async (conversation = active) => { if (!conversation) return; try { const result = await getChatMessages(conversation.id); setMessages(result.data || []); await loadConversations() } catch (requestError) { setError(requestError.message) } }
+
+  useEffect(() => { if (user) loadConversations(); else { setConversations([]); setActive(null); setMessages([]) } }, [user?.id])
+  useEffect(() => {
+    const openRequestedChat = async (event) => {
+      if (!user) { window.location.href = '/login'; return }
+      const { recipientId, serviceId } = event.detail || {}
+      if (!recipientId) return
+      setOpen(true); setLoading(true); setError('')
+      try { const result = await createChatConversation({ recipient_id: recipientId, service_id: serviceId }); const conversation = result.data; setConversations((current) => [conversation, ...current.filter((item) => item.id !== conversation.id)]); setActive(conversation); setMessages([]); await loadMessages(conversation) } catch (requestError) { setError(requestError.message) } finally { setLoading(false) }
+    }
+    window.addEventListener('marketplace:open-chat', openRequestedChat)
+    return () => window.removeEventListener('marketplace:open-chat', openRequestedChat)
+  }, [user?.id])
+  useEffect(() => { if (!open || !user) return undefined; const timer = window.setInterval(() => { loadConversations(); if (active) loadMessages(active) }, 10000); return () => window.clearInterval(timer) }, [open, active?.id, user?.id])
+
+  const selectConversation = async (conversation) => { setActive(conversation); setMessages([]); setError(''); setLoading(true); try { const result = await getChatMessages(conversation.id); setMessages(result.data || []); await loadConversations() } catch (requestError) { setError(requestError.message) } finally { setLoading(false) } }
+  const submit = async (event) => { event.preventDefault(); const value = text.trim(); if (!value || !active || sending) return; setSending(true); setError(''); setText(''); try { await sendChatMessage(active.id, value); await loadMessages(active) } catch (requestError) { setText(value); setError(requestError.message) } finally { setSending(false) } }
+  const quickReply = (value) => { setText(value); window.setTimeout(() => document.getElementById('marketplace-chat-input')?.focus(), 0) }
+
+  if (!user) return <button type="button" onClick={() => { window.location.href = '/login' }} className="fixed bottom-5 right-5 z-[70] grid h-12 w-12 place-items-center rounded-full bg-primary text-white shadow-lg transition hover:scale-105 hover:bg-blue-700" aria-label="Open marketplace chat" title="Chat with a marketplace member"><MessageCircle className="h-5 w-5"/></button>
+
+  return <>
+    {open && <section className="fixed bottom-20 right-4 z-[70] flex h-[min(620px,calc(100vh-110px))] w-[min(390px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl" aria-label="Marketplace chat">
+      <header className="flex items-center justify-between bg-gradient-to-r from-[#082d66] to-primary px-4 py-3 text-white"><div><p className="text-[10px] font-bold uppercase tracking-wider text-blue-100">Marketplace chat</p><h2 className="mt-0.5 text-sm font-bold">Discuss with buyers and providers</h2></div><button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg text-blue-100 hover:bg-white/15" aria-label="Close chat"><X className="h-4 w-4"/></button></header>
+      {!active ? <><div className="border-b bg-blue-50/60 px-4 py-3 text-xs leading-5 text-blue-800">Open a service page and choose <b>Chat with vendor</b> to start a discussion. Your conversations will appear here.</div><div className="min-h-0 flex-1 overflow-y-auto">{loading && <p className="p-5 text-center text-xs text-slate-400">Loading conversations...</p>}{!loading && conversations.length === 0 && <div className="p-8 text-center text-xs text-slate-500">No conversations yet.</div>}{conversations.map((conversation) => { const person = otherPerson(conversation, user.id); return <button type="button" key={conversation.id} onClick={() => selectConversation(conversation)} className="block w-full border-b px-4 py-3 text-left transition hover:bg-blue-50"><div className="flex items-center justify-between gap-3"><span className="truncate text-xs font-bold text-slate-800">{person?.company_name || person?.name || 'Marketplace member'}</span>{Number(conversation.unread_count) > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{conversation.unread_count > 9 ? '9+' : conversation.unread_count}</span>}</div><p className="mt-1 truncate text-[11px] text-slate-500">{conversation.service?.name || 'General discussion'}</p></button> })}</div></> : <><div className="flex items-center gap-2 border-b px-4 py-2.5"><button type="button" onClick={() => setActive(null)} className="text-xs font-bold text-primary hover:underline">All chats</button><span className="text-slate-300">/</span><span className="truncate text-xs font-bold text-slate-700">{otherPerson(active, user.id)?.company_name || otherPerson(active, user.id)?.name || 'Marketplace member'}</span></div><div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-slate-50 p-3">{loading && <p className="py-5 text-center text-xs text-slate-400">Loading messages...</p>}{!loading && messages.length === 0 && <div className="py-8 text-center text-xs text-slate-400">Start the discussion below.</div>}{messages.map((item) => { const mine = item.user_id && Number(item.user_id) === Number(user.id); return <div key={item.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[82%] rounded-2xl px-3 py-2 text-xs leading-5 ${mine ? 'bg-primary text-white' : item.is_auto ? 'border border-emerald-100 bg-emerald-50 text-emerald-800' : 'border bg-white text-slate-700'}`}><p className="whitespace-pre-wrap break-words">{item.message}</p><p className={`mt-1 text-[10px] ${mine ? 'text-blue-100' : 'text-slate-400'}`}>{new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p></div></div> })}</div><div className="border-t bg-white p-3"><div className="mb-2 flex gap-1.5 overflow-x-auto"><button type="button" onClick={() => quickReply('What is the price and delivery time?')} className="shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold text-slate-500 hover:border-primary hover:text-primary">Ask price</button><button type="button" onClick={() => quickReply('Can you share more details?')} className="shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold text-slate-500 hover:border-primary hover:text-primary">More details</button></div><form onSubmit={submit} className="flex gap-2"><input id="marketplace-chat-input" value={text} onChange={(event) => setText(event.target.value)} maxLength="2000" placeholder="Write a message..." className="h-10 min-w-0 flex-1 rounded-lg border px-3 text-xs outline-none focus:border-primary"/><button type="submit" disabled={sending || !text.trim()} className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary text-white disabled:opacity-50" aria-label="Send message"><Send className="h-4 w-4"/></button></form></div></>}
+      {error && <p className="border-t bg-red-50 px-4 py-2 text-[11px] text-red-700">{error}</p>}
+    </section>}
+    <button type="button" onClick={() => { setOpen((value) => !value); if (!open) loadConversations() }} className="fixed bottom-5 right-5 z-[70] grid h-12 w-12 place-items-center rounded-full bg-primary text-white shadow-lg transition hover:scale-105 hover:bg-blue-700" aria-label="Open marketplace chat" title="Marketplace chat"><MessageCircle className="h-5 w-5"/>{unread > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">{unread > 9 ? '9+' : unread}</span>}</button>
+  </>
+}

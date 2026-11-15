@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\UserNotificationStateController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\AdviceRequestController;
 use App\Http\Controllers\Api\BlogController;
+use App\Http\Controllers\Api\MarketplaceChatController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:authentication');
@@ -78,6 +79,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('notification-states/read', [UserNotificationStateController::class, 'markRead']);
     Route::post('notification-states/clear', [UserNotificationStateController::class, 'clear']);
     Route::get('auth/user', [AuthController::class, 'user']);
+    Route::get('marketplace-chat/conversations', [MarketplaceChatController::class, 'conversations']);
+    Route::post('marketplace-chat/conversations', [MarketplaceChatController::class, 'store']);
+    Route::get('marketplace-chat/conversations/{conversation}/messages', [MarketplaceChatController::class, 'messages']);
+    Route::post('marketplace-chat/conversations/{conversation}/messages', [MarketplaceChatController::class, 'sendMessage']);
     Route::post('auth/complete-social-profile', [AuthController::class, 'completeSocialProfile']);
     Route::patch('auth/profile', [AuthController::class, 'updateProfile']);
     Route::patch('auth/company', [AuthController::class, 'updateCompany']);

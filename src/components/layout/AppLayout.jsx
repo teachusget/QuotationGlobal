@@ -10,6 +10,7 @@ import Sidebar from './Sidebar'
 import { loadMarketplaceTheme } from '../../themes/registry'
 import BuyerHeaderSearchPortal from '../marketplace/BuyerHeaderSearchPortal'
 import BuyerCountryHeaderControl from '../marketplace/BuyerCountryHeaderControl'
+import MarketplaceChatWidget from '../chat/MarketplaceChatWidget'
 
 function LayoutFrame({ isBuyer = false, theme = {} }) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -35,10 +36,10 @@ function LayoutFrame({ isBuyer = false, theme = {} }) {
 function BuyerLayout() {
   const { content } = useMarketplaceContent()
   useEffect(() => { loadMarketplaceTheme(content?.document?.theme?.preset).catch(() => {}) }, [content?.document?.theme?.preset])
-  return <><LayoutFrame isBuyer theme={content?.document?.theme || legacyMarketplaceTheme}/><BuyerCountryHeaderControl/><BuyerHeaderSearchPortal/></>
+  return <><LayoutFrame isBuyer theme={content?.document?.theme || legacyMarketplaceTheme}/><BuyerCountryHeaderControl/><BuyerHeaderSearchPortal/><MarketplaceChatWidget/></>
 }
 
 export default function AppLayout() {
   const { user } = useAuth()
-  return user?.account_type === 'buyer' ? <BuyerLayout/> : <LayoutFrame/>
+  return user?.account_type === 'buyer' ? <BuyerLayout/> : <><LayoutFrame/><MarketplaceChatWidget/></>
 }
