@@ -53,15 +53,12 @@ export default function MarketplaceChatWidget() {
   const [emojiOpen, setEmojiOpen] = useState(false)
   const [emojiGroup, setEmojiGroup] = useState('Smileys')
   const [emojiSearch, setEmojiSearch] = useState('')
-  const [recording, setRecording] = useState(false)
   const [sound, setSound] = useState(() => localStorage.getItem(SOUND_KEY) || 'chime')
   const previousUnread = useRef(0)
   const lastMessageId = useRef(0)
   const soundReady = useRef(false)
   const pollInFlight = useRef(false)
   const loadedAttachments = useRef(new Set())
-  const recorder = useRef(null)
-  const recordingChunks = useRef([])
 
   const unread = useMemo(() => conversations.reduce((sum, row) => sum + Number(row.unread_count || 0), 0), [conversations])
   const notify = (count = 1) => { if (soundReady.current && sound !== 'off') Array.from({ length: Math.min(count, 3) }, (_, index) => setTimeout(() => playSound(sound), index * 180)) }
@@ -180,63 +177,6 @@ export default function MarketplaceChatWidget() {
     setEmojiOpen(false)
     setEmojiSearch('')
   }
-
-  const toggleRecording = async () => {
-    if (recording) {
-      recorder.current?.stop()
-      return
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/ogg;codecs=opus'
-      const mediaRecorder = new MediaRecorder(stream, { mimeType })
-      recordingChunks.current = []
-      mediaRecorder.ondataavailable = (event) => { if (event.data.size) recordingChunks.current.push(event.data) }
-      mediaRecorder.onstop = () => {
-        const extension = mimeType.startsWith('audio/ogg') ? 'ogg' : 'webm'
-        const voiceFile = new File([new Blob(recordingChunks.current, { type: mimeType })], `voice-message-${Date.now()}.${extension}`, { type: mimeType })
-        setFile(voiceFile)
-        stream.getTracks().forEach((track) => track.stop())
-        setRecording(false)
-      }
-      recorder.current = mediaRecorder
-      mediaRecorder.start()
-      setRecording(true)
-      setError('Recording voice message… click the microphone again to stop.')
-    } catch { setError('Microphone permission is required to record a voice message.') }
-  }
-
-  useEffect(() => {
-    if (!active) return undefined
-    const form = document.querySelector('section form')
-    if (!form || form.querySelector('[data-voice-record]')) return undefined
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.dataset.voiceRecord = 'true'
-    button.title = 'Record voice message'
-    button.setAttribute('aria-label', 'Record voice message')
-    button.className = 'grid h-10 w-10 shrink-0 place-items-center rounded-lg border text-slate-500 hover:bg-blue-50'
-    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/><line x1="8" x2="16" y1="22" y2="22"/></svg>'
-    button.addEventListener('click', toggleRecording)
-    form.insertBefore(button, form.querySelector('input'))
-    return () => { button.removeEventListener('click', toggleRecording); button.remove() }
-    // The recorder callback intentionally uses the current recording state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, recording])
-
-  useEffect(() => {
-    messages.filter((item) => item.attachment_url && (item.attachment_mime || '').startsWith('audio/')).forEach((item) => {
-      const link = [...document.querySelectorAll('a')].find((element) => element.textContent === (item.attachment_name || 'View attachment'))
-      if (!link || link.dataset.audioReady) return
-      const audio = document.createElement('audio')
-      audio.controls = true
-      audio.preload = 'metadata'
-      audio.src = link.href
-      audio.className = 'mb-2 max-w-full'
-      link.replaceWith(audio)
-      audio.dataset.audioReady = 'true'
-    })
-  }, [messages])
 
   const visibleEmojis = (emojiSearch.trim() ? Object.values(EMOJI_GROUPS).flat() : EMOJI_GROUPS[emojiGroup]).filter(Boolean)
 
