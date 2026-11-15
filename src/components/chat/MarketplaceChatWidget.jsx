@@ -78,12 +78,16 @@ export default function MarketplaceChatWidget() {
   useEffect(() => {
     if (user) loadConversations()
     else { setConversations([]); setActive(null); setMessages([]) }
+    // The polling callbacks intentionally capture the current authenticated user.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
   useEffect(() => {
     if (!user) return undefined
     const timer = setInterval(() => { loadConversations(true); if (open && active) loadMessages(active, true) }, 2000)
     return () => clearInterval(timer)
+    // The polling callbacks intentionally use the current chat state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, open, active?.id, sound])
 
   useEffect(() => {
