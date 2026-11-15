@@ -80,9 +80,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('notification-states/clear', [UserNotificationStateController::class, 'clear']);
     Route::get('auth/user', [AuthController::class, 'user']);
     Route::get('marketplace-chat/conversations', [MarketplaceChatController::class, 'conversations']);
-    Route::post('marketplace-chat/conversations', [MarketplaceChatController::class, 'store']);
+    Route::post('marketplace-chat/conversations', [MarketplaceChatController::class, 'store'])->middleware('throttle:30,1');
     Route::get('marketplace-chat/conversations/{conversation}/messages', [MarketplaceChatController::class, 'messages']);
-    Route::post('marketplace-chat/conversations/{conversation}/messages', [MarketplaceChatController::class, 'sendMessage']);
+    Route::post('marketplace-chat/conversations/{conversation}/messages', [MarketplaceChatController::class, 'sendMessage'])->middleware('throttle:30,1');
     Route::get('marketplace-chat/messages/{message}/attachment', [MarketplaceChatController::class, 'attachment']);
     Route::post('auth/complete-social-profile', [AuthController::class, 'completeSocialProfile']);
     Route::patch('auth/profile', [AuthController::class, 'updateProfile']);

@@ -87,10 +87,6 @@ export default function MarketplaceChatWidget() {
   }, [user?.id, open, active?.id, sound])
 
   useEffect(() => {
-    document.querySelectorAll('input[type="file"]').forEach((input) => { input.accept = '*/*' })
-  }, [active])
-
-  useEffect(() => {
     let cancelled = false
     messages.filter((item) => item.attachment_url && !loadedAttachments.current.has(item.id)).forEach(async (item) => {
       try {
