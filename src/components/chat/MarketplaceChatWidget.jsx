@@ -19,11 +19,11 @@ function playNotificationSound(type = 'chime') {
     const oscillator = context.createOscillator()
     const gain = context.createGain()
     const frequencies = type === 'bell' ? [880, 1175] : type === 'pop' ? [520, 760] : [660, 880]
-    oscillator.type = type === 'pop' ? 'sine' : 'triangle'
+    oscillator.type = type === 'pop' ? 'square' : 'triangle'
     oscillator.frequency.setValueAtTime(frequencies[0], context.currentTime)
     oscillator.frequency.setValueAtTime(frequencies[1], context.currentTime + 0.09)
     gain.gain.setValueAtTime(0.0001, context.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.8, context.currentTime + 0.015)
+    gain.gain.exponentialRampToValueAtTime(1.5, context.currentTime + 0.015)
     gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.24)
     oscillator.connect(gain).connect(context.destination)
     oscillator.start()
