@@ -61,7 +61,7 @@ class MarketplaceChatController extends Controller
         $rows = $conversation->messages()->with('user:id,name,account_type')->oldest()->get();
         $rows->each(function ($row) use ($unreadIds) {
             $row->is_unread = in_array($row->id, $unreadIds, true);
-            $row->attachment_url = $row->attachment_path ? url('/api/marketplace-chat/messages/'.$row->id.'/attachment') : null;
+            $row->attachment_url = $row->attachment_path ? '/api/marketplace-chat/messages/'.$row->id.'/attachment?inline=1' : null;
         });
         return response()->json(['data' => $rows]);
     }
@@ -83,7 +83,7 @@ class MarketplaceChatController extends Controller
         abort_unless($message->attachment_path, 404);
         $path = Storage::disk('public')->path($message->attachment_path);
         abort_unless(is_file($path), 404);
-        if ($request->boolean('inline') || str_starts_with((string) $message->attachment_mime, 'image/')) return response()->file($path, ['Content-Type' => $message->attachment_mime ?: 'application/octet-stream']);
+        if ($request->boolean('inline') || str_starts_with((string) $message->attachment_mime, 'image/')) return response()->file($path, ['Content-Type' => $message->attachment_mime ?: 'application/octet-stream', 'Content-Disposition' => 'inline', 'Cache-Control' => 'private, max-age=300']);
         return Storage::disk('public')->download($message->attachment_path, $message->attachment_name ?: 'chat-attachment');
     }
 
