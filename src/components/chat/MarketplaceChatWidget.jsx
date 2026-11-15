@@ -2,7 +2,7 @@ import { Bell, FileText, ImagePlus, MessageCircle, Phone, Send, Video, Volume2, 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
 import { authHeaders, clearAuth } from '../../auth/session'
-import { createChatConversation, createSupportConversation, getChatConversations, getChatMessages, sendChatMessage } from '../../api/marketplaceChat'
+import { createSupportConversation, getChatConversations, getChatMessages, sendChatMessage } from '../../api/marketplaceChat'
 
 const SOUND_KEY = 'marketplace_chat_sound'
 const SOUNDS = [{ value: 'chime', label: 'Chime' }, { value: 'bell', label: 'Bell' }, { value: 'pop', label: 'Pop' }]
@@ -24,7 +24,7 @@ const playSound = (type) => {
     oscillator.connect(gain).connect(context.destination)
     oscillator.start(); oscillator.stop(context.currentTime + 0.31)
     oscillator.addEventListener('ended', () => context.close())
-  } catch {}
+  } catch { /* Browser audio is best effort. */ }
 }
 
 function otherPerson(conversation, userId) {
@@ -95,7 +95,7 @@ export default function MarketplaceChatWidget() {
         const url = URL.createObjectURL(await response.blob())
         loadedAttachments.current.add(item.id)
         if (!cancelled) setMessages((current) => current.map((row) => row.id === item.id ? { ...row, attachment_url: url } : row))
-      } catch {}
+      } catch { /* Attachment preview is best effort. */ }
     })
     return () => { cancelled = true }
   }, [messages])
