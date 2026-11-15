@@ -56,9 +56,13 @@ class MarketplaceChatController extends Controller
     public function messages(Request $request, MarketplaceConversation $conversation)
     {
         $this->authorizeConversation($request, $conversation);
+        $unreadIds = $conversation->messages()->where('user_id', '!=', $request->user()->id)->whereNull('read_at')->pluck('id')->all();
         $conversation->messages()->where('user_id', '!=', $request->user()->id)->whereNull('read_at')->update(['read_at' => now()]);
         $rows = $conversation->messages()->with('user:id,name,account_type')->oldest()->get();
-        $rows->each(fn ($row) => $row->attachment_url = $row->attachment_path ? url('/api/marketplace-chat/messages/'.$row->id.'/attachment') : null);
+        $rows->each(function ($row) use ($unreadIds) {
+            $row->is_unread = in_array($row->id, $unreadIds, true);
+            $row->attachment_url = $row->attachment_path ? url('/api/marketplace-chat/messages/'.$row->id.'/attachment') : null;
+        });
         return response()->json(['data' => $rows]);
     }
 

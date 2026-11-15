@@ -1,7 +1,7 @@
 import { Bell, FileText, ImagePlus, MessageCircle, Phone, Send, Video, Volume2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
-import { clearAuth } from '../../auth/session'
+import { authHeaders, clearAuth } from '../../auth/session'
 import { createChatConversation, createSupportConversation, getChatConversations, getChatMessages, sendChatMessage } from '../../api/marketplaceChat'
 
 const SOUND_KEY = 'marketplace_chat_sound'
@@ -46,6 +46,7 @@ export default function MarketplaceChatWidget() {
   const previousUnread = useRef(0)
   const lastMessageId = useRef(0)
   const soundReady = useRef(false)
+  const loadedAttachments = useRef(new Set())
 
   const unread = useMemo(() => conversations.reduce((sum, row) => sum + Number(row.unread_count || 0), 0), [conversations])
   const notify = (count = 1) => { if (soundReady.current && sound !== 'off') Array.from({ length: Math.min(count, 3) }, (_, index) => setTimeout(() => playSound(sound), index * 180)) }
@@ -88,6 +89,20 @@ export default function MarketplaceChatWidget() {
   useEffect(() => {
     document.querySelectorAll('input[type="file"]').forEach((input) => { input.accept = '*/*' })
   }, [active])
+
+  useEffect(() => {
+    let cancelled = false
+    messages.filter((item) => item.attachment_url && !loadedAttachments.current.has(item.id)).forEach(async (item) => {
+      try {
+        const response = await fetch(item.attachment_url, { headers: { ...authHeaders() } })
+        if (!response.ok) return
+        const url = URL.createObjectURL(await response.blob())
+        loadedAttachments.current.add(item.id)
+        if (!cancelled) setMessages((current) => current.map((row) => row.id === item.id ? { ...row, attachment_url: url } : row))
+      } catch {}
+    })
+    return () => { cancelled = true }
+  }, [messages])
 
   const openConversation = async (conversation) => {
     soundReady.current = true; setActive(conversation); setMessages([]); setError(''); setLoading(true); lastMessageId.current = 0
