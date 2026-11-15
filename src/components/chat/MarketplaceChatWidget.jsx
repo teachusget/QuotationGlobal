@@ -1,4 +1,4 @@
-import { Bell, FileText, ImagePlus, MessageCircle, Phone, PhoneCall, Send, Video, Volume2, X } from 'lucide-react'
+import { Bell, Download, FileText, ImagePlus, MessageCircle, Phone, PhoneCall, Send, Video, Volume2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
 import { authHeaders, clearAuth } from '../../auth/session'
@@ -42,6 +42,7 @@ export default function MarketplaceChatWidget() {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [previewImage, setPreviewImage] = useState(null)
   const [sound, setSound] = useState(() => localStorage.getItem(SOUND_KEY) || 'chime')
   const previousUnread = useRef(0)
   const lastMessageId = useRef(0)
@@ -104,6 +105,16 @@ export default function MarketplaceChatWidget() {
     return () => { cancelled = true }
   }, [messages])
 
+  useEffect(() => {
+    const handleImageClick = (event) => {
+      const image = event.target.closest?.('img')
+      if (!image || (!image.src.startsWith('blob:') && !image.src.includes('/api/marketplace-chat/'))) return
+      setPreviewImage({ url: image.currentSrc || image.src, name: image.alt || 'chat-image' })
+    }
+    document.addEventListener('click', handleImageClick)
+    return () => document.removeEventListener('click', handleImageClick)
+  }, [])
+
   const openConversation = async (conversation) => {
     soundReady.current = true; setActive(conversation); setMessages([]); setError(''); setLoading(true); lastMessageId.current = 0
     try { await loadMessages(conversation) } finally { setLoading(false) }
@@ -138,6 +149,7 @@ export default function MarketplaceChatWidget() {
   if (!user) return <button type="button" onClick={() => { window.location.href = '/login' }} className="fixed bottom-5 right-5 z-[70] grid h-12 w-12 place-items-center rounded-full bg-primary text-white shadow-lg" aria-label="Open marketplace chat"><MessageCircle className="h-5 w-5" /></button>
 
   return <>
+    {previewImage && <div className="fixed inset-0 z-[90] grid place-items-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label="Image preview" onClick={() => setPreviewImage(null)}><div className="relative flex max-h-full max-w-5xl flex-col items-center gap-3" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => setPreviewImage(null)} className="absolute -right-2 -top-2 z-10 grid h-9 w-9 place-items-center rounded-full bg-white text-slate-700 shadow" aria-label="Close image preview"><X className="h-5 w-5" /></button><img src={previewImage.url} alt={previewImage.name} className="max-h-[80vh] max-w-full rounded-xl object-contain shadow-2xl" /><a href={previewImage.url} download={previewImage.name} className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-bold text-primary shadow hover:bg-blue-50"><Download className="h-4 w-4" />Download image</a></div></div>}
     {open && <section className="fixed bottom-20 right-4 z-[70] flex h-[min(620px,calc(100vh-110px))] w-[min(390px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl">
       <header className="flex items-center justify-between bg-gradient-to-r from-[#082d66] to-primary px-4 py-3 text-white">
         <div><p className="text-[10px] font-bold uppercase tracking-wider text-blue-100">Marketplace chat</p><h2 className="mt-0.5 text-sm font-bold">Discuss with buyers and providers</h2></div>
