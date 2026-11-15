@@ -8,6 +8,7 @@ use App\Models\MarketplaceMessage;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 class MarketplaceChatController extends Controller
 {
@@ -61,7 +62,7 @@ class MarketplaceChatController extends Controller
         $rows = $conversation->messages()->with('user:id,name,account_type')->oldest()->get();
         $rows->each(function ($row) use ($unreadIds) {
             $row->is_unread = in_array($row->id, $unreadIds, true);
-            $row->attachment_url = $row->attachment_path ? '/api/marketplace-chat/messages/'.$row->id.'/attachment?inline=1' : null;
+            $row->attachment_url = $row->attachment_path ? URL::temporarySignedRoute('marketplace-chat.attachment', now()->addMinutes(10), ['message' => $row->id, 'inline' => 1]) : null;
         });
         return response()->json(['data' => $rows]);
     }
@@ -79,7 +80,8 @@ class MarketplaceChatController extends Controller
 
     public function attachment(Request $request, MarketplaceMessage $message)
     {
-        $this->authorizeConversation($request, $message->conversation);
+        if ($request->user()) $this->authorizeConversation($request, $message->conversation);
+        else abort_unless(URL::hasValidSignature($request), 401, 'Attachment link expired.');
         abort_unless($message->attachment_path, 404);
         $path = Storage::disk('public')->path($message->attachment_path);
         abort_unless(is_file($path), 404);

@@ -83,7 +83,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('marketplace-chat/conversations', [MarketplaceChatController::class, 'store'])->middleware('throttle:30,1');
     Route::get('marketplace-chat/conversations/{conversation}/messages', [MarketplaceChatController::class, 'messages']);
     Route::post('marketplace-chat/conversations/{conversation}/messages', [MarketplaceChatController::class, 'sendMessage'])->middleware('throttle:30,1');
-    Route::get('marketplace-chat/messages/{message}/attachment', [MarketplaceChatController::class, 'attachment']);
     Route::post('auth/complete-social-profile', [AuthController::class, 'completeSocialProfile']);
     Route::patch('auth/profile', [AuthController::class, 'updateProfile']);
     Route::patch('auth/company', [AuthController::class, 'updateCompany']);
@@ -195,6 +194,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('demo-requests/{demoRequest}/messages', [DemoRequestController::class, 'messages'])->middleware('permission:messages.view');
     Route::post('demo-requests/{demoRequest}/messages', [DemoRequestController::class, 'sendMessage'])->middleware('permission:messages.send');
 });
+
+Route::get('marketplace-chat/messages/{message}/attachment', [MarketplaceChatController::class, 'attachment'])->name('marketplace-chat.attachment');
 
 Route::get('categories/{category}/logo', [CategoryController::class, 'logo'])->withoutMiddleware('throttle:api')->middleware('throttle:marketplace-media');
 Route::get('brands/{brand}/logo', [BrandController::class, 'logo'])->withoutMiddleware('throttle:api')->middleware('throttle:marketplace-media');
