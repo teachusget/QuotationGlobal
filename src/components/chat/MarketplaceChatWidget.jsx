@@ -81,7 +81,7 @@ export default function MarketplaceChatWidget() {
 
   useEffect(() => {
     if (!user) return undefined
-    const timer = setInterval(() => { loadConversations(true); if (open && active) loadMessages(active, true) }, 10000)
+    const timer = setInterval(() => { loadConversations(true); if (open && active) loadMessages(active, true) }, 2000)
     return () => clearInterval(timer)
   }, [user?.id, open, active?.id, sound])
 
