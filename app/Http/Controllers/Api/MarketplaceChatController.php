@@ -62,6 +62,7 @@ class MarketplaceChatController extends Controller
         $rows = $conversation->messages()->with('user:id,name,account_type')->oldest()->get();
         $rows->each(function ($row) use ($unreadIds) {
             $row->is_unread = in_array($row->id, $unreadIds, true);
+            if ($row->is_unread) $row->read_at = null;
             $row->attachment_url = $row->attachment_path ? URL::temporarySignedRoute('marketplace-chat.attachment', now()->addMinutes(10), ['message' => $row->id, 'inline' => 1]) : null;
         });
         return response()->json(['data' => $rows]);
