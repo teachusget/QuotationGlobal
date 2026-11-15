@@ -86,7 +86,16 @@ class MarketplaceChatController extends Controller
         abort_unless($message->attachment_path, 404);
         $path = Storage::disk('public')->path($message->attachment_path);
         abort_unless(is_file($path), 404);
-        if ($request->boolean('inline') || str_starts_with((string) $message->attachment_mime, 'image/')) return response()->file($path, ['Content-Type' => $message->attachment_mime ?: 'application/octet-stream', 'Content-Disposition' => 'inline', 'Cache-Control' => 'private, max-age=300']);
+        if ($request->boolean('inline') || str_starts_with((string) $message->attachment_mime, 'image/')) {
+            $filename = preg_replace('/[^A-Za-z0-9._-]/', '_', basename($message->attachment_name ?: 'attachment'));
+            return response()->file($path, [
+                'Content-Type' => $message->attachment_mime ?: 'application/octet-stream',
+                'Content-Disposition' => 'inline; filename="'.$filename.'"',
+                'Content-Length' => (string) filesize($path),
+                'Cache-Control' => 'private, max-age=300',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        }
         return Storage::disk('public')->download($message->attachment_path, $message->attachment_name ?: 'chat-attachment');
     }
 
