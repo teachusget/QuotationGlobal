@@ -9,5 +9,6 @@ async function request(url, options = {}) {
 
 export const getChatConversations = () => request('/api/marketplace-chat/conversations')
 export const createChatConversation = (payload) => request('/api/marketplace-chat/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+export const createSupportConversation = () => createChatConversation({ support: true })
 export const getChatMessages = (id) => request(`/api/marketplace-chat/conversations/${id}/messages`)
 export const sendChatMessage = (id, message) => request(`/api/marketplace-chat/conversations/${id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }) })

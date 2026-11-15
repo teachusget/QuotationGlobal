@@ -25,11 +25,17 @@ class MarketplaceChatController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'recipient_id' => ['required', 'integer', 'exists:users,id'],
+            'recipient_id' => ['nullable', 'integer', 'exists:users,id'],
             'service_id' => ['nullable', 'integer', 'exists:services,id'],
+            'support' => ['nullable', 'boolean'],
             'message' => ['nullable', 'string', 'max:2000'],
         ]);
         $user = $request->user();
+        if (!empty($data['support'])) {
+            $data['recipient_id'] = User::query()->whereIn('account_type', ['staff', 'admin'])->where('is_blocked', false)->orderBy('id')->value('id');
+            abort_unless($data['recipient_id'], 503, 'Marketplace support is temporarily unavailable.');
+        }
+        abort_unless($data['recipient_id'], 422, 'Choose a chat recipient.');
         $recipient = User::findOrFail($data['recipient_id']);
         abort_if($recipient->id === $user->id, 422, 'You cannot start a chat with yourself.');
         abort_if($recipient->is_blocked, 422, 'This account is not available for chat.');
