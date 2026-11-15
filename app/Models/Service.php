@@ -20,13 +20,15 @@ class Service extends Model
             Cache::forget('marketplace:categories:v2');
         });
     }
-    protected $fillable = ['vendor_id', 'category_id', 'subcategory_id', 'industry_id', 'brand_id', 'name', 'sku', 'inventory_quantity', 'low_stock_threshold', 'track_inventory', 'features', 'image_data', 'certificates', 'service_type', 'deployment', 'ai_enabled', 'sell_globally', 'selling_countries', 'pricing_mode', 'price_from', 'monthly_price', 'discount_percent', 'billing_cycle', 'view_count'];
+    protected $fillable = ['vendor_id', 'category_id', 'subcategory_id', 'industry_id', 'brand_id', 'name', 'sku', 'inventory_quantity', 'low_stock_threshold', 'track_inventory', 'features', 'image_data', 'certificates', 'brochure', 'user_picture', 'service_type', 'deployment', 'ai_enabled', 'sell_globally', 'selling_countries', 'pricing_mode', 'price_from', 'monthly_price', 'discount_percent', 'billing_cycle', 'view_count'];
 
     protected $casts = [
         'ai_enabled' => 'boolean',
         'sell_globally' => 'boolean',
         'selling_countries' => 'array',
         'certificates' => 'array',
+        'brochure' => 'array',
+        'user_picture' => 'array',
         'track_inventory' => 'boolean',
         'view_count' => 'integer',
     ];

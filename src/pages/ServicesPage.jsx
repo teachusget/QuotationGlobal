@@ -1,4 +1,4 @@
-import { ChevronDown, Eye, FileCheck2, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
+import { ChevronDown, Eye, FileCheck2, FileText, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import Swal from 'sweetalert2'
 import { getBrands } from '../api/brands'
@@ -17,7 +17,7 @@ const subscriptionPlans = [{ value: 'monthly', label: 'Monthly', months: 1 }, { 
 const servicePlans = [{ value: 'hourly', label: 'Hourly', months: 1 / 720 }, { value: 'daily', label: 'Daily', months: 1 / 30 }, { value: 'monthly', label: 'Monthly', months: 1 }, { value: 'annual', label: 'Yearly', months: 12 }]
 let pricingServiceType = ''
 const plans = { map: (callback) => (pricingServiceType === 'hardware' ? [] : pricingServiceType === 'services' ? servicePlans : subscriptionPlans).map(callback) }
-const blank = { vendor_id: '', name: '', sku: '', inventory_quantity: '', low_stock_threshold: 5, track_inventory: true, features: '', certificates: [], specifications: {}, service_type: '', deployment: '', ai_enabled: '', sell_globally: '', selling_countries: [], pricing_mode: 'starting_price', category_id: '', subcategory_id: '', industry_ids: [], brand_id: '', monthly_price: '', billing_cycles: [], discounts: {} }
+const blank = { vendor_id: '', name: '', sku: '', inventory_quantity: '', low_stock_threshold: 5, track_inventory: true, features: '', certificates: [], brochure: null, specifications: {}, service_type: '', deployment: '', ai_enabled: '', sell_globally: '', selling_countries: [], pricing_mode: 'starting_price', category_id: '', subcategory_id: '', industry_ids: [], brand_id: '', monthly_price: '', billing_cycles: [], discounts: {} }
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 
@@ -122,6 +122,7 @@ export default function ServicesPage() {
     const setAiEnabled = (event) => set('ai_enabled', event.detail)
     const setDeployment = (event) => set('deployment', event.detail)
     const setCertificates = (event) => { setEditorTouched(true); setForm((current) => ({ ...current, certificates: event.detail })) }
+    const setAttachments = (event) => { setEditorTouched(true); setForm((current) => ({ ...current, ...event.detail })) }
     const removeDeletedProduct = (event) => {
       const deleted = event.detail
       setServices((current) => current.filter((item) => !(item.vendor_id === deleted.vendor_id && item.name === deleted.name && item.service_type === deleted.service_type)))
@@ -134,7 +135,7 @@ export default function ServicesPage() {
       pricingServiceType = service.service_type
       const discounts = Object.fromEntries(service.plans.map((plan) => [plan.billing_cycle, Number(plan.discount_percent || 0)]))
       const specifications = Object.fromEntries((service.specification_values || []).map((item) => [item.specification_definition_id, item.value]))
-      setForm({ vendor_id: String(service.vendor_id), name: service.name, sku: service.sku || '', inventory_quantity: service.inventory_quantity ?? '', low_stock_threshold: service.low_stock_threshold ?? 5, track_inventory: service.track_inventory ?? true, features: service.features || '', certificates: service.certificates || [], specifications, service_type: service.service_type, deployment: service.deployment || '', ai_enabled: Boolean(service.ai_enabled), sell_globally: Boolean(service.sell_globally), selling_countries: service.selling_countries || [], pricing_mode: service.pricing_mode, category_id: String(service.category_id), subcategory_id: String(service.subcategory_id), industry_ids: (service.industries || []).map((item) => String(item.id)), brand_id: (service.brands || []).map((item) => String(item.id)), monthly_price: String(service.monthly_price || 0), billing_cycles: service.plans.map((plan) => plan.billing_cycle), discounts })
+      setForm({ vendor_id: String(service.vendor_id), name: service.name, sku: service.sku || '', inventory_quantity: service.inventory_quantity ?? '', low_stock_threshold: service.low_stock_threshold ?? 5, track_inventory: service.track_inventory ?? true, features: service.features || '', certificates: service.certificates || [], brochure: service.brochure || null, user_picture: service.user_picture || null, specifications, service_type: service.service_type, deployment: service.deployment || '', ai_enabled: Boolean(service.ai_enabled), sell_globally: Boolean(service.sell_globally), selling_countries: service.selling_countries || [], pricing_mode: service.pricing_mode, category_id: String(service.category_id), subcategory_id: String(service.subcategory_id), industry_ids: (service.industries || []).map((item) => String(item.id)), brand_id: (service.brands || []).map((item) => String(item.id)), monthly_price: String(service.monthly_price || 0), billing_cycles: service.plans.map((plan) => plan.billing_cycle), discounts })
       // Set the ref synchronously as image selection/save events can happen
       // before React has committed the state update.
       editingIdRef.current = service.id
@@ -144,6 +145,7 @@ export default function ServicesPage() {
       setTimeout(async () => {
         window.dispatchEvent(new CustomEvent('service-editor-mode', { detail: service.id }))
         window.dispatchEvent(new CustomEvent('service-existing-images-editor-value', { detail: (service.images || []).map((image) => ({ id: image.id, sort_order: image.sort_order, image_url: image.image_url || `/api/marketplace/service-images/${image.id}` })) }))
+        window.dispatchEvent(new CustomEvent('service-attachments-editor-value', { detail: { brochure: service.brochure || null, user_picture: service.user_picture || null } }))
         try {
           const result = await getServiceImages(service.id)
           if (imageLoadVersion !== imageLoadVersionRef.current || editingIdRef.current !== service.id) return
@@ -160,6 +162,7 @@ export default function ServicesPage() {
     window.addEventListener('service-ai-selected', setAiEnabled)
     window.addEventListener('service-deployment-selected', setDeployment)
     window.addEventListener('service-certificates-selected', setCertificates)
+    window.addEventListener('service-attachments-selected', setAttachments)
     window.addEventListener('service-product-deleted', removeDeletedProduct)
     window.addEventListener('service-selling-changed', setSellingCountries)
     window.addEventListener('service-edit-requested', editProduct)
@@ -172,6 +175,7 @@ export default function ServicesPage() {
       window.removeEventListener('service-ai-selected', setAiEnabled)
       window.removeEventListener('service-deployment-selected', setDeployment)
       window.removeEventListener('service-certificates-selected', setCertificates)
+      window.removeEventListener('service-attachments-selected', setAttachments)
       window.removeEventListener('service-product-deleted', removeDeletedProduct)
       window.removeEventListener('service-selling-changed', setSellingCountries)
       window.removeEventListener('service-edit-requested', editProduct)
@@ -284,7 +288,33 @@ function AiAndSpecifications() {
   const [aiEnabled, setAiEnabled] = useState('')
   useEffect(() => { const load = (event) => setAiEnabled(event.detail ? 'yes' : 'no'); window.addEventListener('service-ai-editor-value', load); return () => window.removeEventListener('service-ai-editor-value', load) }, [])
   const selectAi = (selected) => { setAiEnabled(selected); window.dispatchEvent(new CustomEvent('service-ai-selected', { detail: selected === 'yes' })) }
-  return <><CertificateUpload/><DeploymentEditor/><fieldset className="mt-4 rounded-md border border-blue-100 bg-blue-50/60 p-3"><legend className="px-1 text-xs font-semibold">Is this service AI enabled? *</legend><div className="mt-1 flex gap-5">{['yes', 'no'].map((option) => <label key={option} className="flex cursor-pointer items-center gap-2 text-sm font-medium capitalize"><input required type="radio" name="ai_enabled" value={option} checked={aiEnabled === option} onChange={() => selectAi(option)} className="h-4 w-4"/>{option}</label>)}</div></fieldset><GlobalSellingEditor/><StructuredSpecifications/></>
+  return <><CertificateUpload/><ServiceAttachments/><DeploymentEditor/><fieldset className="mt-4 rounded-md border border-blue-100 bg-blue-50/60 p-3"><legend className="px-1 text-xs font-semibold">Is this service AI enabled? *</legend><div className="mt-1 flex gap-5">{['yes', 'no'].map((option) => <label key={option} className="flex cursor-pointer items-center gap-2 text-sm font-medium capitalize"><input required type="radio" name="ai_enabled" value={option} checked={aiEnabled === option} onChange={() => selectAi(option)} className="h-4 w-4"/>{option}</label>)}</div></fieldset><GlobalSellingEditor/><StructuredSpecifications/></>
+}
+
+function ServiceAttachments() {
+  const [brochure, setBrochure] = useState(null)
+  const [userPicture, setUserPicture] = useState(null)
+  const [uploadError, setUploadError] = useState('')
+  const brochureRef = useRef(null); const pictureRef = useRef(null)
+  useEffect(() => { const load = (event) => { setBrochure(event.detail?.brochure || null); setUserPicture(event.detail?.user_picture || null) }; window.addEventListener('service-attachments-editor-value', load); return () => window.removeEventListener('service-attachments-editor-value', load) }, [])
+  const publish = (nextBrochure, nextPicture) => { setBrochure(nextBrochure); setUserPicture(nextPicture); window.dispatchEvent(new CustomEvent('service-attachments-selected', { detail: { brochure: nextBrochure, user_picture: nextPicture } })) }
+  const readFile = (file, kind) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve({ name: file.name, data: reader.result, type: file.type }); reader.onerror = reject; reader.readAsDataURL(file) })
+  const choose = async (event, kind) => {
+    const file = event.target.files?.[0]; event.target.value = ''; if (!file) return
+    const isPicture = kind === 'user_picture'
+    const valid = isPicture ? ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) : ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+    const maxBytes = isPicture ? MAX_UPLOAD_BYTES : MAX_DOCUMENT_BYTES
+    if (!valid) return setUploadError('Use a PDF, PNG, JPG or WebP brochure.')
+    if (file.size > maxBytes) return setUploadError(`${isPicture ? 'User picture' : 'Brochure'} must be ${isPicture ? '5 MB' : '10 MB'} or smaller.`)
+    try {
+      const prepared = isPicture ? await prepareUpload(file) : file
+      const value = await readFile(prepared, kind)
+      publish(kind === 'brochure' ? value : brochure, kind === 'user_picture' ? value : userPicture); setUploadError('')
+    } catch (error) { setUploadError(error.message || 'Unable to read the selected file.') }
+  }
+  const remove = (kind) => { publish(kind === 'brochure' ? null : brochure, kind === 'user_picture' ? null : userPicture); setUploadError('') }
+  return <div className="mb-4 rounded-md border border-blue-100 bg-blue-50/30 p-3"><p className="text-xs font-semibold">Service Brochure <span className="font-normal text-slate-400">(optional)</span></p><input ref={brochureRef} type="file" accept="application/pdf,image/png,image/jpeg,image/webp,.pdf,.png,.jpg,.jpeg,.webp" onChange={(event) => choose(event, 'brochure')} className="sr-only"/><button type="button" onClick={() => brochureRef.current?.click()} className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-dashed bg-white text-xs font-semibold text-primary hover:border-primary hover:bg-blue-50"><FileText className="h-4 w-4"/>{brochure ? 'Replace brochure' : 'Upload brochure'}</button>{brochure && <div className="mt-2 rounded-md border bg-white p-2">{brochure.type?.startsWith('image/') && <img src={brochure.data} alt={brochure.name} className="mb-2 h-32 w-full rounded object-contain"/>}<p className="truncate text-[11px] font-semibold text-slate-700">{brochure.name}</p><a href={brochure.data} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-[11px] font-semibold text-primary hover:underline">View brochure</a><button type="button" onClick={() => remove('brochure')} className="ml-3 text-[11px] font-semibold text-red-600">Remove</button></div>}{uploadError && <p className="mt-2 text-[11px] text-red-600">{uploadError}</p>}<p className="mt-2 text-[10px] text-slate-400">PDF, PNG, JPG or WebP · Maximum 10 MB</p></div>
+  return <div className="mb-4 rounded-md border border-blue-100 bg-blue-50/30 p-3"><p className="text-xs font-semibold">Brochure & User Picture <span className="font-normal text-slate-400">(optional)</span></p><div className="mt-2 grid gap-3 sm:grid-cols-2"><div><input ref={brochureRef} type="file" accept="application/pdf,.pdf" onChange={(event) => choose(event, 'brochure')} className="sr-only"/><button type="button" onClick={() => brochureRef.current?.click()} className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-dashed bg-white text-xs font-semibold text-primary hover:border-primary hover:bg-blue-50"><FileText className="h-4 w-4"/>{brochure ? 'Replace brochure' : 'Upload brochure'}</button>{brochure && <div className="mt-2 rounded-md border bg-white p-2"><p className="truncate text-[11px] font-semibold text-slate-700">{brochure.name}</p><a href={brochure.data} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-[11px] font-semibold text-primary hover:underline">View brochure</a><button type="button" onClick={() => remove('brochure')} className="ml-3 text-[11px] font-semibold text-red-600">Remove</button></div>}</div><div><input ref={pictureRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => choose(event, 'user_picture')} className="sr-only"/><button type="button" onClick={() => pictureRef.current?.click()} className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-dashed bg-white text-xs font-semibold text-primary hover:border-primary hover:bg-blue-50"><ImagePlus className="h-4 w-4"/>{userPicture ? 'Replace user picture' : 'Upload user picture'}</button>{userPicture && <div className="mt-2 flex items-center gap-2 rounded-md border bg-white p-2"><img src={userPicture.data} alt="User picture preview" className="h-12 w-12 rounded-md border object-cover"/><span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-slate-700">{userPicture.name}</span><button type="button" onClick={() => remove('user_picture')} className="text-[11px] font-semibold text-red-600">Remove</button></div>}</div></div>{uploadError && <p className="mt-2 text-[11px] text-red-600">{uploadError}</p>}<p className="mt-2 text-[10px] text-slate-400">Brochure: PDF up to 10 MB · User picture: PNG, JPG or WebP up to 5 MB</p></div>
 }
 
 function CertificateUpload() {
