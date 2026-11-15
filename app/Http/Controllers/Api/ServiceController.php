@@ -56,7 +56,7 @@ class ServiceController extends Controller
         if (! $hasViewCount) $columns = array_values(array_diff($columns, ['view_count']));
         $data = Cache::remember("marketplace:services:v2:{$cacheMode}:{$version}", 300, function () use ($columns, $hasViewCount) {
             $services = Service::query()->whereHas('vendor', fn ($vendor) => $vendor->where('status', 'approved'))->select($columns)->with([
-                'vendor:id,company_name,name', 'category:id,name', 'subcategory:id,name', 'brand:id,name',
+                'vendor:id,user_id,company_name,name', 'category:id,name', 'subcategory:id,name', 'brand:id,name',
                 'brands:id,name', 'industries:id,name',
                 'specificationValues:id,service_id,specification_definition_id,value',
                 'specificationValues.definition:id,name,field_type,unit',
