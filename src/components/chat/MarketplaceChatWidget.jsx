@@ -1,6 +1,7 @@
 import { MessageCircle, Send, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
+import { clearAuth } from '../../auth/session'
 import { createChatConversation, createSupportConversation, getChatConversations, getChatMessages, sendChatMessage } from '../../api/marketplaceChat'
 
 function otherPerson(conversation, userId) {
@@ -38,7 +39,7 @@ export default function MarketplaceChatWidget() {
 
   const selectConversation = async (conversation) => { setActive(conversation); setMessages([]); setError(''); setLoading(true); try { const result = await getChatMessages(conversation.id); setMessages(result.data || []); await loadConversations() } catch (requestError) { setError(requestError.message) } finally { setLoading(false) } }
   const startSupportChat = async () => { setLoading(true); setError(''); try { const result = await createSupportConversation(); const conversation = result.data; setConversations((current) => [conversation, ...current.filter((item) => item.id !== conversation.id)]); setActive(conversation); setMessages([]); await loadMessages(conversation) } catch (requestError) { setError(requestError.message) } finally { setLoading(false) } }
-  const submit = async (event) => { event.preventDefault(); const value = text.trim(); if (!value || !active || sending) return; setSending(true); setError(''); setText(''); try { await sendChatMessage(active.id, value); await loadMessages(active) } catch (requestError) { setText(value); setError(requestError.message) } finally { setSending(false) } }
+  const submit = async (event) => { event.preventDefault(); const value = text.trim(); if (!value || !active || sending) return; setSending(true); setError(''); setText(''); try { await sendChatMessage(active.id, value); await loadMessages(active) } catch (requestError) { setText(value); if (requestError.status === 401) { clearAuth(); window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`; return } setError(requestError.message) } finally { setSending(false) } }
   const quickReply = (value) => { setText(value); window.setTimeout(() => document.getElementById('marketplace-chat-input')?.focus(), 0) }
 
   if (!user) return <button type="button" onClick={() => { window.location.href = '/login' }} className="fixed bottom-5 right-5 z-[70] grid h-12 w-12 place-items-center rounded-full bg-primary text-white shadow-lg transition hover:scale-105 hover:bg-blue-700" aria-label="Open marketplace chat" title="Chat with a marketplace member"><MessageCircle className="h-5 w-5"/></button>

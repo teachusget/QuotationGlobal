@@ -3,7 +3,11 @@ import { authHeaders } from '../auth/session'
 async function request(url, options = {}) {
   const response = await fetch(url, { ...options, headers: { Accept: 'application/json', ...authHeaders(), ...options.headers } })
   const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(data.errors ? Object.values(data.errors).flat()[0] : data.message || 'Chat request failed.')
+  if (!response.ok) {
+    const error = new Error(data.errors ? Object.values(data.errors).flat()[0] : data.message || 'Chat request failed.')
+    error.status = response.status
+    throw error
+  }
   return data
 }
 
