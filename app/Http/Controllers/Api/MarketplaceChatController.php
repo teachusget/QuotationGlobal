@@ -7,6 +7,7 @@ use App\Models\MarketplaceConversation;
 use App\Models\MarketplaceMessage;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class MarketplaceChatController extends Controller
 {
@@ -15,7 +16,7 @@ class MarketplaceChatController extends Controller
         $user = $request->user();
         $rows = MarketplaceConversation::query()
             ->where(fn ($query) => $query->where('buyer_id', $user->id)->orWhere('vendor_id', $user->id))
-            ->with(['buyer:id,name,account_type', 'vendor:id,name,company_name,account_type', 'service:id,name'])
+            ->with(['buyer:id,name,phone,account_type', 'vendor:id,name,company_name,phone,account_type', 'service:id,name'])
             ->withCount(['messages as unread_count' => fn ($query) => $query->whereNull('read_at')->where('user_id', '!=', $user->id)])
             ->orderByDesc('last_message_at')->orderByDesc('id')->get();
 
@@ -49,29 +50,40 @@ class MarketplaceChatController extends Controller
         );
 
         if (!empty(trim($data['message'] ?? ''))) $this->createMessage($conversation, $user, trim($data['message']));
-        return response()->json(['data' => $conversation->load(['buyer:id,name,account_type', 'vendor:id,name,company_name,account_type', 'service:id,name'])], 201);
+        return response()->json(['data' => $conversation->load(['buyer:id,name,phone,account_type', 'vendor:id,name,company_name,phone,account_type', 'service:id,name'])], 201);
     }
 
     public function messages(Request $request, MarketplaceConversation $conversation)
     {
         $this->authorizeConversation($request, $conversation);
         $conversation->messages()->where('user_id', '!=', $request->user()->id)->whereNull('read_at')->update(['read_at' => now()]);
-        return response()->json(['data' => $conversation->messages()->with('user:id,name,account_type')->oldest()->get()]);
+        $rows = $conversation->messages()->with('user:id,name,account_type')->oldest()->get();
+        $rows->each(fn ($row) => $row->attachment_url = $row->attachment_path ? url('/api/marketplace-chat/messages/'.$row->id.'/attachment') : null);
+        return response()->json(['data' => $rows]);
     }
 
     public function sendMessage(Request $request, MarketplaceConversation $conversation)
     {
         $this->authorizeConversation($request, $conversation);
-        $data = $request->validate(['message' => ['required', 'string', 'max:2000']]);
-        $message = $this->createMessage($conversation, $request->user(), trim($data['message']));
-        $autoReply = $this->autoReply($conversation, $data['message']);
+        $data = $request->validate(['message' => ['nullable', 'string', 'max:2000'], 'attachment' => ['nullable', 'file', 'max:5120', 'mimes:jpg,jpeg,png,webp,gif,pdf,doc,docx']]);
+        abort_unless(trim($data['message'] ?? '') !== '' || $request->hasFile('attachment'), 422, 'Write a message or attach a file.');
+        $message = $this->createMessage($conversation, $request->user(), trim($data['message'] ?? ''), false, $request->file('attachment'));
+        $autoReply = $request->hasFile('attachment') ? null : $this->autoReply($conversation, $data['message'] ?? '');
         if ($autoReply) $this->createMessage($conversation, null, $autoReply, true);
         return response()->json(['data' => $message->load('user:id,name,account_type'), 'auto_reply' => $autoReply], 201);
     }
 
-    private function createMessage(MarketplaceConversation $conversation, ?User $user, string $message, bool $isAuto = false): MarketplaceMessage
+    public function attachment(Request $request, MarketplaceMessage $message)
     {
-        $row = $conversation->messages()->create(['user_id' => $user?->id, 'message' => $message, 'is_auto' => $isAuto, 'read_at' => $isAuto ? now() : null]);
+        $this->authorizeConversation($request, $message->conversation);
+        abort_unless($message->attachment_path, 404);
+        return Storage::disk('public')->download($message->attachment_path, $message->attachment_name ?: 'chat-attachment');
+    }
+
+    private function createMessage(MarketplaceConversation $conversation, ?User $user, string $message, bool $isAuto = false, $attachment = null): MarketplaceMessage
+    {
+        $path = $attachment?->store('marketplace/chat', 'public');
+        $row = $conversation->messages()->create(['user_id' => $user?->id, 'message' => $message, 'is_auto' => $isAuto, 'read_at' => $isAuto ? now() : null, 'attachment_path' => $path, 'attachment_name' => $attachment?->getClientOriginalName(), 'attachment_mime' => $attachment?->getMimeType(), 'attachment_size' => $attachment?->getSize()]);
         $conversation->update(['last_message_at' => now()]);
         return $row;
     }

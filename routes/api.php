@@ -83,6 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('marketplace-chat/conversations', [MarketplaceChatController::class, 'store']);
     Route::get('marketplace-chat/conversations/{conversation}/messages', [MarketplaceChatController::class, 'messages']);
     Route::post('marketplace-chat/conversations/{conversation}/messages', [MarketplaceChatController::class, 'sendMessage']);
+    Route::get('marketplace-chat/messages/{message}/attachment', [MarketplaceChatController::class, 'attachment']);
     Route::post('auth/complete-social-profile', [AuthController::class, 'completeSocialProfile']);
     Route::patch('auth/profile', [AuthController::class, 'updateProfile']);
     Route::patch('auth/company', [AuthController::class, 'updateCompany']);
