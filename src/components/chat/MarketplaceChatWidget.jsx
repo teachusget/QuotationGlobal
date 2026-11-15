@@ -1,4 +1,4 @@
-import { Bell, Download, FileText, ImagePlus, MessageCircle, Phone, PhoneCall, Send, Video, Volume2, X } from 'lucide-react'
+import { Bell, Download, FileText, ImagePlus, MessageCircle, Phone, PhoneCall, Search, Send, Smile, Video, Volume2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../auth/useAuth'
 import { authHeaders, clearAuth } from '../../auth/session'
@@ -6,6 +6,13 @@ import { createSupportConversation, getChatConversations, getChatMessages, sendC
 
 const SOUND_KEY = 'marketplace_chat_sound'
 const SOUNDS = [{ value: 'chime', label: 'Chime' }, { value: 'bell', label: 'Bell' }, { value: 'pop', label: 'Pop' }]
+const EMOJI_GROUPS = {
+  Smileys: '😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🤩 🥳 😏 😒 😞 😔 😟 😕 🙁 ☹️ 😣 😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🤭 🤫 🤥 😶 😐 😑 😬 🙄 😯 😦 😧 😮 😲 🥱 😴 🤤 😪 😵 🤐 🤑 🤠'.split(' '),
+  People: '👋 🤚 🖐️ ✋ 👌 🤏 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👍 👎 ✊ 👊 🤝 🙏 💪 👀 👄 💋 🧠 👶 🧒 👦 👧 🧑 👨 👩 🧔 👴 👵'.split(' '),
+  Nature: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐙 🦄 🐝 🦋 🐢 🐍 🦎 🐳 🐬 🐟 🐠 🦈 🐘 🦒 🦓 🌸 🌹 🌻 🌞 🌈 ⭐ ⚡ 🔥 ❄️ 🌙 ☀️'.split(' '),
+  Food: '🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🍍 🥝 🍅 🥑 🍔 🍟 🍕 🌭 🌮 🌯 🥗 🍿 🍩 🍪 🎂 🍰 🍫 🍬 🍭 ☕ 🍵 🥤 🍺 🍻 🍷'.split(' '),
+  Symbols: '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ✅ ❌ ❗ ❓ ⁉️ 💯 🔥 ✨ ⭐ 🌟 💫 🎉 🎊 ✔️ ➕ ➖'.split(' '),
+}
 
 const playSound = (type) => {
   if (type === 'off') return
@@ -43,12 +50,18 @@ export default function MarketplaceChatWidget() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [previewImage, setPreviewImage] = useState(null)
+  const [emojiOpen, setEmojiOpen] = useState(false)
+  const [emojiGroup, setEmojiGroup] = useState('Smileys')
+  const [emojiSearch, setEmojiSearch] = useState('')
+  const [recording, setRecording] = useState(false)
   const [sound, setSound] = useState(() => localStorage.getItem(SOUND_KEY) || 'chime')
   const previousUnread = useRef(0)
   const lastMessageId = useRef(0)
   const soundReady = useRef(false)
   const pollInFlight = useRef(false)
   const loadedAttachments = useRef(new Set())
+  const recorder = useRef(null)
+  const recordingChunks = useRef([])
 
   const unread = useMemo(() => conversations.reduce((sum, row) => sum + Number(row.unread_count || 0), 0), [conversations])
   const notify = (count = 1) => { if (soundReady.current && sound !== 'off') Array.from({ length: Math.min(count, 3) }, (_, index) => setTimeout(() => playSound(sound), index * 180)) }
@@ -117,6 +130,11 @@ export default function MarketplaceChatWidget() {
   }, [messages])
 
   useEffect(() => {
+    const scrollers = document.querySelectorAll('.bg-slate-50.p-3')
+    scrollers.forEach((element) => { element.scrollTop = element.scrollHeight })
+  }, [messages, active?.id])
+
+  useEffect(() => {
     const handleImageClick = (event) => {
       const image = event.target.closest?.('img')
       if (!image || (!image.src.startsWith('blob:') && !image.src.includes('/api/marketplace-chat/'))) return
@@ -157,9 +175,74 @@ export default function MarketplaceChatWidget() {
     setError(''); setFile(next); event.target.value = ''
   }
 
+  const insertEmoji = (emoji) => {
+    setText((current) => `${current}${emoji}`)
+    setEmojiOpen(false)
+    setEmojiSearch('')
+  }
+
+  const toggleRecording = async () => {
+    if (recording) {
+      recorder.current?.stop()
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/ogg;codecs=opus'
+      const mediaRecorder = new MediaRecorder(stream, { mimeType })
+      recordingChunks.current = []
+      mediaRecorder.ondataavailable = (event) => { if (event.data.size) recordingChunks.current.push(event.data) }
+      mediaRecorder.onstop = () => {
+        const extension = mimeType.startsWith('audio/ogg') ? 'ogg' : 'webm'
+        const voiceFile = new File([new Blob(recordingChunks.current, { type: mimeType })], `voice-message-${Date.now()}.${extension}`, { type: mimeType })
+        setFile(voiceFile)
+        stream.getTracks().forEach((track) => track.stop())
+        setRecording(false)
+      }
+      recorder.current = mediaRecorder
+      mediaRecorder.start()
+      setRecording(true)
+      setError('Recording voice message… click the microphone again to stop.')
+    } catch { setError('Microphone permission is required to record a voice message.') }
+  }
+
+  useEffect(() => {
+    if (!active) return undefined
+    const form = document.querySelector('section form')
+    if (!form || form.querySelector('[data-voice-record]')) return undefined
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.dataset.voiceRecord = 'true'
+    button.title = 'Record voice message'
+    button.setAttribute('aria-label', 'Record voice message')
+    button.className = 'grid h-10 w-10 shrink-0 place-items-center rounded-lg border text-slate-500 hover:bg-blue-50'
+    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/><line x1="8" x2="16" y1="22" y2="22"/></svg>'
+    button.addEventListener('click', toggleRecording)
+    form.insertBefore(button, form.querySelector('input'))
+    return () => { button.removeEventListener('click', toggleRecording); button.remove() }
+    // The recorder callback intentionally uses the current recording state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, recording])
+
+  useEffect(() => {
+    messages.filter((item) => item.attachment_url && (item.attachment_mime || '').startsWith('audio/')).forEach((item) => {
+      const link = [...document.querySelectorAll('a')].find((element) => element.textContent === (item.attachment_name || 'View attachment'))
+      if (!link || link.dataset.audioReady) return
+      const audio = document.createElement('audio')
+      audio.controls = true
+      audio.preload = 'metadata'
+      audio.src = link.href
+      audio.className = 'mb-2 max-w-full'
+      link.replaceWith(audio)
+      audio.dataset.audioReady = 'true'
+    })
+  }, [messages])
+
+  const visibleEmojis = (emojiSearch.trim() ? Object.values(EMOJI_GROUPS).flat() : EMOJI_GROUPS[emojiGroup]).filter(Boolean)
+
   if (!user) return <button type="button" onClick={() => { window.location.href = '/login' }} className="fixed bottom-5 right-5 z-[70] grid h-12 w-12 place-items-center rounded-full bg-primary text-white shadow-lg" aria-label="Open marketplace chat"><MessageCircle className="h-5 w-5" /></button>
 
-  return <>
+  return <>{emojiOpen && <div className="fixed bottom-36 right-4 z-[80] w-[min(350px,calc(100vw-32px))] overflow-hidden rounded-xl border bg-white shadow-2xl"><div className="flex items-center gap-2 border-b p-2"><Search className="h-4 w-4 shrink-0 text-slate-400" /><input autoFocus value={emojiSearch} onChange={(event) => setEmojiSearch(event.target.value)} placeholder="Search emoji" className="min-w-0 flex-1 text-xs outline-none" /></div>{!emojiSearch && <div className="flex gap-1 overflow-x-auto border-b px-2 py-1">{Object.keys(EMOJI_GROUPS).map((group) => <button key={group} type="button" onClick={() => setEmojiGroup(group)} className={`shrink-0 rounded px-2 py-1 text-[10px] font-semibold ${emojiGroup === group ? 'bg-blue-50 text-primary' : 'text-slate-500'}`}>{group}</button>)}</div>}<div className="grid max-h-44 grid-cols-8 gap-1 overflow-y-auto p-2">{visibleEmojis.map((emoji, index) => <button key={`${emoji}-${index}`} type="button" onClick={() => insertEmoji(emoji)} className="rounded p-1 text-xl leading-none hover:bg-blue-50" title="Add emoji">{emoji}</button>)}</div></div>}<button type="button" onClick={() => setEmojiOpen((value) => !value)} className={`fixed bottom-5 right-20 z-[80] grid h-12 w-12 place-items-center rounded-full border bg-white shadow-lg hover:bg-blue-50 ${emojiOpen ? 'text-primary' : 'text-slate-600'}`} title="Choose emoji" aria-label="Choose emoji"><Smile className="h-5 w-5" /></button>
     {previewImage && <div className="fixed inset-0 z-[90] grid place-items-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label="Image preview" onClick={() => setPreviewImage(null)}><div className="relative flex max-h-full max-w-5xl flex-col items-center gap-3" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => setPreviewImage(null)} className="absolute -right-2 -top-2 z-10 grid h-9 w-9 place-items-center rounded-full bg-white text-slate-700 shadow" aria-label="Close image preview"><X className="h-5 w-5" /></button><img src={previewImage.url} alt={previewImage.name} className="max-h-[80vh] max-w-full rounded-xl object-contain shadow-2xl" /><a href={previewImage.url} download={previewImage.name} className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-xs font-bold text-primary shadow hover:bg-blue-50"><Download className="h-4 w-4" />Download image</a></div></div>}
     {open && <section className="fixed bottom-20 right-4 z-[70] flex h-[min(620px,calc(100vh-110px))] w-[min(390px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl">
       <header className="flex items-center justify-between bg-gradient-to-r from-[#082d66] to-primary px-4 py-3 text-white">
