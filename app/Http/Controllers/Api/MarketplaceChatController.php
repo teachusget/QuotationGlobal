@@ -77,6 +77,9 @@ class MarketplaceChatController extends Controller
     {
         $this->authorizeConversation($request, $message->conversation);
         abort_unless($message->attachment_path, 404);
+        $path = Storage::disk('public')->path($message->attachment_path);
+        abort_unless(is_file($path), 404);
+        if ($request->boolean('inline') || str_starts_with((string) $message->attachment_mime, 'image/')) return response()->file($path, ['Content-Type' => $message->attachment_mime ?: 'application/octet-stream']);
         return Storage::disk('public')->download($message->attachment_path, $message->attachment_name ?: 'chat-attachment');
     }
 
