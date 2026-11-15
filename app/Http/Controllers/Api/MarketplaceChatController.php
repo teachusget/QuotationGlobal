@@ -16,7 +16,7 @@ class MarketplaceChatController extends Controller
     {
         $user = $request->user();
         $rows = MarketplaceConversation::query()
-            ->where(fn ($query) => $query->where('buyer_id', $user->id)->orWhere('vendor_id', $user->id))
+            ->when(! $this->canManageAllChats($user), fn ($query) => $query->where(fn ($nested) => $nested->where('buyer_id', $user->id)->orWhere('vendor_id', $user->id)))
             ->with(['buyer:id,name,phone,account_type', 'vendor:id,name,company_name,phone,account_type', 'service:id,name'])
             ->withCount(['messages as unread_count' => fn ($query) => $query->whereNull('read_at')->where('user_id', '!=', $user->id)])
             ->orderByDesc('last_message_at')->orderByDesc('id')->get();
@@ -109,7 +109,13 @@ class MarketplaceChatController extends Controller
 
     private function authorizeConversation(Request $request, MarketplaceConversation $conversation): void
     {
-        abort_unless(in_array($request->user()->id, [$conversation->buyer_id, $conversation->vendor_id], true), 403);
+        $user = $request->user();
+        abort_unless($this->canManageAllChats($user) || in_array($user->id, [$conversation->buyer_id, $conversation->vendor_id], true), 403);
+    }
+
+    private function canManageAllChats(User $user): bool
+    {
+        return $user->isSuperAdmin();
     }
 
     private function autoReply(MarketplaceConversation $conversation, string $message): ?string
